@@ -14,4 +14,5 @@ urlpatterns = [
     path('project/<int:project_id>/objective-tree/', views.objective_tree_view, name='objective_tree'),
     path('objective/delete/<int:objective_id>/', views.delete_objective, name='delete_objective'),
     path('project/<int:project_id>/objective-tree/download/png/', views.download_objective_tree_png, name='download_objective_tree_png'),
+    path('stakeholder/delete/<int:stakeholder_id>/', views.delete_stakeholder, name='delete_stakeholder'),
 ]

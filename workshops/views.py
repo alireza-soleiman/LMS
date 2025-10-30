@@ -506,3 +506,10 @@ def workshop_list(request):
     }
     # We will create this new template in Step 3
     return render(request, 'workshops/workshop_list.html', context)
+
+@require_POST
+def delete_stakeholder(request, stakeholder_id):
+    stakeholder = get_object_or_404(Stakeholder, id=stakeholder_id)
+    project_id = stakeholder.project.id
+    stakeholder.delete()
+    return redirect('stakeholder_list', project_id=project_id)
