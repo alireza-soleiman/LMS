@@ -513,3 +513,68 @@ def delete_stakeholder(request, stakeholder_id):
     project_id = stakeholder.project.id
     stakeholder.delete()
     return redirect('stakeholder_list', project_id=project_id)
+
+
+from django.http import JsonResponse
+from .models import Project, Problem  # Make sure Problem is imported at the top
+
+
+# ... other views ...
+
+def problem_tree_data(request, project_id):
+    """
+    This new API view serves the problem tree data as a hierarchical JSON
+    for D3.js to consume.
+    """
+    project = get_object_or_404(Project, id=project_id)
+
+    # We fetch all problems for this project at once
+    all_problems = Problem.objects.filter(project=project)
+
+    # We need to find the root node(s)
+    # These are problems with no parent, or (in our case) the CORE problems
+    root_problems = all_problems.filter(problem_type='CORE')
+
+    if not root_problems.exists():
+        # Fallback: if no CORE, maybe a problem with no parent?
+        root_problems = all_problems.filter(parent__isnull=True)
+        if not root_problems.exists() and all_problems.exists():
+            # If all else fails, just pick the first one as a dummy root
+            # This is a safety net, but ideally you have a CORE problem
+            root_problems = [all_problems.first()]
+        elif not all_problems.exists():
+            return JsonResponse({'name': 'No problems', 'children': []})  # Empty tree
+
+    # We'll build our tree starting from a dummy "Project" root
+    # This helps D3 if there are multiple CORE problems
+    tree_data = {
+        'name': project.title,
+        'id': 'project-root',
+        'children': []
+    }
+
+    # A helper function to recursively find children
+    def get_children(problem_node):
+        children = []
+        child_problems = all_problems.filter(parent=problem_node)
+        for child in child_problems:
+            children.append({
+                'name': child.description,
+                'id': child.id,
+                'type': child.problem_type,
+                'color': child.color,
+                'children': get_children(child)  # Recursion!
+            })
+        return children
+
+    # Populate the children of our dummy root
+    for root_node in root_problems:
+        tree_data['children'].append({
+            'name': root_node.description,
+            'id': root_node.id,
+            'type': root_node.problem_type,
+            'color': root_node.color,
+            'children': get_children(root_node)
+        })
+
+    return JsonResponse(tree_data)
