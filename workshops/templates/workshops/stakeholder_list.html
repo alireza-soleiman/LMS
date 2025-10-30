@@ -10,6 +10,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
+        .d3-tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 6px 10px;
+            font: 12px sans-serif;
+            background: #333;
+            color: #fff;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none; /* Lets mouse events pass through */
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
         /* General Styles */
         body { background-color: #f8f9fa; }
         .axis-label { font-size: 14px; font-weight: bold; text-anchor: middle; }
@@ -89,7 +102,7 @@
                                             <div class="dropdown">
                                                 <button class="color-tag tag-select-btn dropdown-toggle
                                                     {% if s.level %}level-{{ s.level }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="level-{{s.id}}" data-bs-toggle="dropdown">
+                                                    type="button" id="level-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
                                                     {{ s.get_level_display|default:"Select..." }}
                                                 </button>
                                                 <ul class="dropdown-menu" aria-labelledby="level-{{s.id}}">
@@ -106,7 +119,7 @@
                                             <div class="dropdown">
                                                 <button class="color-tag tag-select-btn dropdown-toggle
                                                     {% if s.typology %}typology-{{ s.typology }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="typology-{{s.id}}" data-bs-toggle="dropdown">
+                                                    type="button" id="typology-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
                                                     {{ s.get_typology_display|default:"Select..." }}
                                                 </button>
                                                 <ul class="dropdown-menu" aria-labelledby="typology-{{s.id}}">
@@ -122,7 +135,7 @@
                                             <div class="dropdown">
                                                 <button class="color-tag tag-select-btn dropdown-toggle
                                                     {% if s.resources %}resources-{{ s.resources }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="resources-{{s.id}}" data-bs-toggle="dropdown">
+                                                    type="button" id="resources-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
                                                     {{ s.get_resources_display|default:"Select..." }}
                                                 </button>
                                                 <ul class="dropdown-menu" aria-labelledby="resources-{{s.id}}">
@@ -234,6 +247,12 @@
             const x = d3.scaleLinear().domain([0, 100]).range([0, width]);
             const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
 
+            let tooltip = d3.select("body").select(".d3-tooltip");
+                if (tooltip.empty()) {
+                    tooltip = d3.select("body").append("div")
+            .attr("class", "d3-tooltip");
+                    }
+
             // Draw Quadrant Backgrounds
             const quadrantData = [
                 { x: 0, y: y(50), w: width/2, h: height/2, color: "#f7f7f7" }, // Secondary
@@ -274,6 +293,14 @@
             d3.json(uniqueApiUrl).then(function(data) {
                 svg.append('g').selectAll("g").data(data).join("g")
                   .attr("class", "stakeholder-node").attr("transform", d => `translate(${x(d.interest)}, ${y(d.power)})`)
+                    .on("mouseover", function(event, d) {
+              tooltip.transition().style("opacity", .9);
+                tooltip.html(`<strong>Power:</strong> ${d.power}<br><strong>Interest:</strong> ${d.interest}`)                  .style("left", (event.pageX + 10) + "px")
+                  .style("top", (event.pageY - 28) + "px");
+          })
+          .on("mouseout", function(d) {
+              tooltip.transition().style("opacity", 0);
+          })
                   .call(g => g.append("circle")
                       .attr("r", 10)
                       .style("fill", d => {
