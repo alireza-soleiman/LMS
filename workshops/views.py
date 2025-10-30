@@ -64,12 +64,9 @@ def stakeholder_data(request, project_id):
     return JsonResponse(stakeholders, safe=False)
 
 
-
+# --- THIS IS THE NEW, SIMPLIFIED FUNCTION ---
 def problem_tree_view(request, project_id):
-    project = Project.objects.get(id=project_id)
-    form = ProblemForm(project=project)
-    svg_output = "<p>Problem tree will be displayed here.</p>"
-    all_problems = Problem.objects.none()
+    project = get_object_or_404(Project, id=project_id)
 
     # --- Handle POST Request ---
     if request.method == 'POST':
@@ -83,97 +80,21 @@ def problem_tree_view(request, project_id):
         else:
             print("Form is NOT valid. Errors:")
             print(form.errors)
-            # Fall through to render with errors
+            # If form is invalid, we'll fall through and re-render with the errors
 
-    # --- Graphviz Diagram Generation (Runs for GET and invalid POST) ---
-    try:
-        dot = graphviz.Digraph(comment=f'Problem Tree for {project.title}',
-                               graph_attr={'rankdir': 'TB'})
+    # --- Handle GET Request (or invalid POST) ---
+    form = ProblemForm(project=project)  # Create a fresh form for GET
 
-        all_problems = Problem.objects.filter(project=project).order_by('problem_type', 'description')
+    # We still need all_problems for the "Manage Problems" list
+    all_problems = Problem.objects.filter(project=project).order_by('problem_type', 'description')
 
-        if all_problems.exists():
-            core_problems = [p for p in all_problems if p.problem_type == 'CORE']
-            effect_problems = [p for p in all_problems if p.problem_type == 'EFFECT']
-            cause_problems = [p for p in all_problems if p.problem_type == 'CAUSE']
-
-            node_styles = {
-                'CORE': {'shape': 'box', 'style': 'filled', 'fillcolor': '#ffc107', 'margin': '0.2,0.1'},
-                'EFFECT': {'shape': 'box', 'style': 'filled', 'fillcolor': '#f8d7da', 'margin': '0.2,0.1'},
-                'CAUSE': {'shape': 'box', 'style': 'filled', 'fillcolor': '#cfe2ff', 'margin': '0.2,0.1'}
-            }
-
-            # Add all nodes first (without rank)
-            for problem in all_problems:
-                style_attrs = node_styles.get(problem.problem_type, {}).copy()
-                if hasattr(problem, 'color') and problem.color:
-                    style_attrs['fillcolor'] = problem.color
-                dot.node(str(problem.id), problem.description, **style_attrs)
-
-            # Add VISIBLE edges showing relationships, adjusting direction
-            for problem in all_problems:
-                if problem.parent:
-                    # If it's an Effect linked to a Core problem
-                    if problem.problem_type == 'EFFECT' and problem.parent.problem_type == 'CORE':
-                        # Edge Core -> Effect (arrow points to Effect)
-                        # Set constraint=false so this edge doesn't force ranking
-                        dot.edge(str(problem.parent.id), str(problem.id), constraint='false')
-                    # If it's a Cause linked to anything (Core or another Cause)
-                    elif problem.problem_type == 'CAUSE':
-                        # Edge Parent -> Cause, but arrow points UP to Parent
-                        dot.edge(str(problem.parent.id), str(problem.id), dir='back')
-                    # Optional: Default case
-                    # else:
-                    #    dot.edge(str(problem.parent.id), str(problem.id))
-
-            # Add INVISIBLE edges to enforce vertical ranking (Effect -> Core -> Cause)
-            # Connect all Effects to all Core Problems (forces Effects above Core)
-            for effect in effect_problems:
-                for core in core_problems:
-                    dot.edge(str(effect.id), str(core.id), style='invis')
-
-            # Connect all Core Problems to all first-level Causes (forces Core above first Causes)
-            first_level_causes = [p for p in cause_problems if p.parent in core_problems]
-            for core in core_problems:
-                for cause in first_level_causes:
-                    # Only add edge if this cause is directly linked to *this* core
-                    if cause.parent_id == core.id:
-                        dot.edge(str(core.id), str(cause.id), style='invis')
-
-            # Connect first-level Causes to their second-level Causes (forces level 1 above level 2)
-            for cause1 in first_level_causes:
-                second_level_causes = [p for p in cause_problems if p.parent_id == cause1.id]
-                for cause2 in second_level_causes:
-                    dot.edge(str(cause1.id), str(cause2.id), style='invis')
-            # (Extend this pattern if you need more levels)
-
-            svg_output = dot.pipe(format='svg').decode('utf-8')
-            svg_output = svg_output.replace(f'<title>{dot.comment}</title>', '', 1)
-
-        else: # Handle case where no problems exist yet
-            # This 'else' is correctly indented inside the 'try'
-            svg_output = "<p>No problems added yet to generate a tree.</p>"
-
-    # These 'except' blocks are correctly aligned with 'try'
-    except FileNotFoundError:
-        svg_output = "<p class='text-danger'>Error: Graphviz executable not found...</p>"
-        print("ERROR: Graphviz executable not found...")
-    except Exception as e:
-        svg_output = f"<p class='text-danger'>Error rendering graph: {e}</p>"
-        print(f"ERROR rendering graph: {e}")
-
-    # *** CRITICAL INDENTATION ***
-    # These lines MUST be at the same indentation level as the 'try'/'except'
-    # and the 'if request.method == POST:' block above.
-    # They should NOT be indented further.
     context = {
         'project': project,
         'form': form,
-        'problem_tree_svg': svg_output,
         'all_problems': all_problems,
+        # 'problem_tree_svg' is no longer needed! D3.js handles it.
     }
     return render(request, 'workshops/problem_tree_graphviz.html', context)
-
 # --- Other views ---
 def update_stakeholder_details(request, stakeholder_id):
     # This view only accepts asynchronous POST requests
@@ -519,62 +440,67 @@ from django.http import JsonResponse
 from .models import Project, Problem  # Make sure Problem is imported at the top
 
 
-# ... other views ...
+
+
 
 def problem_tree_data(request, project_id):
     """
     This new API view serves the problem tree data as a hierarchical JSON
     for D3.js to consume.
+    It finds the first CORE problem and builds two-sided tree data.
     """
     project = get_object_or_404(Project, id=project_id)
-
-    # We fetch all problems for this project at once
     all_problems = Problem.objects.filter(project=project)
 
-    # We need to find the root node(s)
-    # These are problems with no parent, or (in our case) the CORE problems
-    root_problems = all_problems.filter(problem_type='CORE')
+    # 1. Find the first CORE problem to act as the root
+    core_problem = all_problems.filter(problem_type='CORE').first()
 
-    if not root_problems.exists():
-        # Fallback: if no CORE, maybe a problem with no parent?
-        root_problems = all_problems.filter(parent__isnull=True)
-        if not root_problems.exists() and all_problems.exists():
-            # If all else fails, just pick the first one as a dummy root
-            # This is a safety net, but ideally you have a CORE problem
-            root_problems = [all_problems.first()]
-        elif not all_problems.exists():
-            return JsonResponse({'name': 'No problems', 'children': []})  # Empty tree
+    if not core_problem:
+        # If no core problem exists, send a specific flag
+        return JsonResponse({'name': 'No Core Problem Defined', 'no_core_problem': True})
 
-    # We'll build our tree starting from a dummy "Project" root
-    # This helps D3 if there are multiple CORE problems
-    tree_data = {
-        'name': project.title,
-        'id': 'project-root',
-        'children': []
-    }
+    # 2. Recursive helper function to find all descendants
+    def get_children(parent_node):
+        # This will hold the children, split by type
+        children_data = {'causes': [], 'effects': []}
 
-    # A helper function to recursively find children
-    def get_children(problem_node):
-        children = []
-        child_problems = all_problems.filter(parent=problem_node)
+        # Find all direct children of the current parent
+        child_problems = all_problems.filter(parent=parent_node)
+
         for child in child_problems:
-            children.append({
+            # Get the children of this child, recursively
+            grand_children = get_children(child)
+
+            # Build the node data for this child
+            node_data = {
                 'name': child.description,
                 'id': child.id,
                 'type': child.problem_type,
                 'color': child.color,
-                'children': get_children(child)  # Recursion!
-            })
-        return children
+                # Pass the recursively-found children along
+                'causes': grand_children['causes'],
+                'effects': grand_children['effects']
+            }
 
-    # Populate the children of our dummy root
-    for root_node in root_problems:
-        tree_data['children'].append({
-            'name': root_node.description,
-            'id': root_node.id,
-            'type': root_node.problem_type,
-            'color': root_node.color,
-            'children': get_children(root_node)
-        })
+            # 3. Sort the child into the correct list
+            if child.problem_type == 'EFFECT':
+                children_data['effects'].append(node_data)
+            else:
+                # Any other type (CAUSE, or even another CORE) goes down
+                children_data['causes'].append(node_data)
+
+        return children_data
+
+    # 4. Build the final tree data, starting from the core problem
+    core_children = get_children(core_problem)
+
+    tree_data = {
+        'name': core_problem.description,
+        'id': core_problem.id,
+        'type': core_problem.problem_type,
+        'color': core_problem.color,
+        'causes': core_children['causes'],  # The 'down' tree
+        'effects': core_children['effects']  # The 'up' tree
+    }
 
     return JsonResponse(tree_data)
