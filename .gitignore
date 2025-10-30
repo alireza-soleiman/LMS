@@ -1,0 +1,15 @@
+# Python / Django
+*.pyc
+__pycache__/
+venv/
+*.env
+.env
+
+# Database
+db.sqlite3
+*.sqlite3
+
+# IDE files
+.idea/
+*.swp
+*.swo
