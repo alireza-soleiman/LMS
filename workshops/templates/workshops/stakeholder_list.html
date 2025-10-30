@@ -78,8 +78,8 @@
                                             <th>Level</th>
                                             <th>Typology</th>
                                             <th>Resource</th>
-                                            <th class="print-hide">Interest</th> <th class="print-hide">Power</th>    </tr>
-                                    </thead>
+                                        </tr>
+                                </thead>
                                 <tbody>
                                     {% for s in stakeholders %}
                                     <tr>
@@ -118,7 +118,6 @@
                                                 </ul>
                                             </div>
                                         </td>
-
                                         <td>
                                             <div class="dropdown">
                                                 <button class="color-tag tag-select-btn dropdown-toggle
@@ -132,27 +131,6 @@
                                                     <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Legal')"><span class="color-tag resources-Legal">Legal</span></a></li>
                                                     <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Cognitive')"><span class="color-tag resources-Cognitive">Cognitive</span></a></li>
                                                 </ul>
-                                            </div>
-                                        </td>
-
-                                        <td>
-                                            <div class="range-slider-container">
-                                                <input type="range" class="form-range" min="0" max="100"
-                                                       value="{{ s.interest }}"
-                                                       id="interest-slider-{{s.id}}"
-                                                       oninput="updateSliderLabel(this)"
-                                                       onchange="updateStakeholderValue(this, '{{ s.id }}', 'interest')">
-                                                <span class="value-label" id="interest-slider-{{s.id}}-label">{{ s.interest }}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="range-slider-container">
-                                                <input type="range" class="form-range" min="0" max="100"
-                                                       value="{{ s.power }}"
-                                                       id="power-slider-{{s.id}}"
-                                                       oninput="updateSliderLabel(this)"
-                                                       onchange="updateStakeholderValue(this, '{{ s.id }}', 'power')">
-                                                <span class="value-label" id="power-slider-{{s.id}}-label">{{ s.power }}</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -177,6 +155,47 @@
                         </form>
                     </div>
                 </div>
+
+                <div class="card shadow-sm mt-4">
+        <div class="card-header"><h2 class="h5 mb-0">Modify Power & Interest</h2></div>
+        <div class="card-body">
+            <p>Drag the sliders to update stakeholder power/interest. The matrix will update in real-time.</p>
+             <ul class="list-group list-group-flush">
+
+                {% for s in stakeholders %}
+                <li class="list-group-item py-3">
+                    <strong class="d-block mb-2">{{ s.name }}</strong>
+
+                    <div class="range-slider-container">
+                        <label for="interest-slider-{{s.id}}" class="form-label small mb-0">Interest</label>
+                        <div class="d-flex align-items-center">
+                            <input type="range" class="form-range" min="0" max="100"
+                                   value="{{ s.interest }}"
+                                   id="interest-slider-{{s.id}}"
+                                   oninput="updateSliderLabel(this)"
+                                   onchange="updateStakeholderValue(this, '{{ s.id }}', 'interest')">
+                            <span class="value-label" id="interest-slider-{{s.id}}-label">{{ s.interest }}</span>
+                        </div>
+                    </div>
+
+                    <div class="range-slider-container mt-2">
+                        <label for="power-slider-{{s.id}}" class="form-label small mb-0">Power</label>
+                        <div class="d-flex align-items-center">
+                            <input type="range" class="form-range" min="0" max="100"
+                                   value="{{ s.power }}"
+                                   id="power-slider-{{s.id}}"
+                                   oninput="updateSliderLabel(this)"
+                                   onchange="updateStakeholderValue(this, '{{ s.id }}', 'power')">
+                            <span class="value-label" id="power-slider-{{s.id}}-label">{{ s.power }}</span>
+                        </div>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-muted">No stakeholders to modify.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
                 <div class="card shadow-sm mt-4">
                     <div class="card-header"><h2 class="h5 mb-0">Actions</h2></div>
                     <div class="card-body d-grid gap-2">
@@ -188,6 +207,8 @@
             </div>
         </div>
     </div>
+
+
 
     <script>
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -319,7 +340,18 @@
             })
             .catch(error => console.error('Error:', error));
         }
+        function updateSliderLabel(slider) {
+            // Get the slider's current value
+            const value = slider.value;
 
+            // Find the corresponding label span (which has an ID of "slider-id" + "-label")
+            const label = document.getElementById(slider.id + '-label');
+
+            // Update the label's text
+            if (label) {
+                label.textContent = value;
+            }
+        }
         // --- Download Matrix as PNG ---
         function downloadMatrixAsPNG() {
             const matrixElement = document.getElementById("d3-matrix-container");
