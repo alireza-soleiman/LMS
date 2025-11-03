@@ -127,12 +127,11 @@ class Indicator(models.Model):
 
 
 class MasterIndicator(models.Model):
+    category = models.CharField(max_length=255, blank=True, null=True)
+    criterion = models.CharField(max_length=255, blank=True, null=True)
     name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    category = models.CharField(max_length=100, blank=True)
-    source = models.CharField(max_length=255, blank=True)
-    unit = models.CharField(max_length=100, blank=True)
-    # Add other columns from Excel as needed
+    description = models.TextField(blank=True, null=True)
+    unit = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return self.name
