@@ -51,7 +51,22 @@ class ObjectiveForm(forms.ModelForm):
             'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
         }
 
+# workshops/forms.py  (add near other forms)
+
+from django.core.exceptions import ValidationError
+
 class IndicatorForm(forms.ModelForm):
     class Meta:
         model = Indicator
         fields = ['name', 'description', 'accepted']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Indicator name'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Optional description'}),
+            'accepted': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean_name(self):
+        name = self.cleaned_data.get('name', '').strip()
+        if not name:
+            raise ValidationError("Indicator name cannot be empty.")
+        return name

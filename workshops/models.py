@@ -96,12 +96,31 @@ class Objective(models.Model):
     def __str__(self):
         return self.description
 
+# workshops/models.py  (add this after Objective or at the bottom)
+
 class Indicator(models.Model):
+    """
+    Indicators used in WS3 (Indicator Selection).
+    Each Indicator belongs to a Project (so each project/group sees its own set).
+    'accepted' -> selected in Phase 1 (Delphi).
+    'added_by_student' -> true if student added a custom indicator.
+    'order' -> integer ranking order (1 = top priority). Null if not ranked yet.
+    'white_cards_after' -> number of white cards inserted after this indicator (0..4).
+    'weight' -> computed normalized weight (float).
+    """
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='indicators')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     accepted = models.BooleanField(default=False)
     added_by_student = models.BooleanField(default=False)
     order = models.PositiveIntegerField(null=True, blank=True)
-    white_cards_after = models.PositiveIntegerField(default=0, help_text="0=weak, 4=extreme importance gap")
-    weight = models.FloatField(null=True, blank=True)  # Normalized weight
+    white_cards_after = models.PositiveSmallIntegerField(default=0, help_text="0=weak ... 4=extreme")
+    weight = models.FloatField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-accepted', 'order', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({'accepted' if self.accepted else 'not accepted'})"

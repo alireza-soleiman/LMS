@@ -13,4 +13,14 @@ urlpatterns = [
     path('problem/delete/<int:problem_id>/', views.delete_problem, name='delete_problem'),
     path('api/project/<int:project_id>/problem-data/', views.problem_tree_data, name='problem_tree_data_api'),
     path('stakeholder/delete/<int:stakeholder_id>/', views.delete_stakeholder, name='delete_stakeholder'),
+    path('project/<int:project_id>/indicators/', views.indicator_selection_view, name='indicator_selection'),
+    path('project/<int:project_id>/indicators/ranking/', views.indicator_ranking_view, name='indicator_ranking'),
+    path('project/<int:project_id>/indicators/download/', views.download_indicators_csv, name='download_indicators_csv'),
+# workshops/urls.py  (add near other workshop endpoints)
+    path('project/<int:project_id>/indicators/', views.indicator_selection_view, name='indicator_selection'),
+    path('project/<int:project_id>/indicators/ranking/', views.indicator_ranking_view, name='indicator_ranking'),
+    path('project/<int:project_id>/indicators/download/', views.download_indicators_csv, name='download_indicators_csv'),
+    path('indicator/toggle/<int:indicator_id>/', views.toggle_indicator_accept, name='toggle_indicator_accept'),
+
+
 ]

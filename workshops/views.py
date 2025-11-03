@@ -1,12 +1,14 @@
 
-from .models import Project, Problem, Stakeholder , Objective
-from .forms import StakeholderForm , ProblemForm , ObjectiveForm
+from .models import Project, Problem, Stakeholder ,   Indicator
+from .forms import StakeholderForm , ProblemForm , IndicatorForm
 import csv
 import json
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-import graphviz
+from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
+
 
 def stakeholder_list(request, project_id):
     project = Project.objects.get(id=project_id)
@@ -162,13 +164,6 @@ def delete_stakeholder(request, stakeholder_id):
     return redirect('stakeholder_list', project_id=project_id)
 
 
-from django.http import JsonResponse
-from .models import Project, Problem  # Make sure Problem is imported at the top
-
-
-
-
-
 def problem_tree_data(request, project_id):
     """
     This new API view serves the problem tree data as a hierarchical JSON
@@ -230,3 +225,136 @@ def problem_tree_data(request, project_id):
     }
 
     return JsonResponse(tree_data)
+
+
+
+
+# Phase 1: Indicator selection (Delphi)
+def indicator_selection_view(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+
+    # Handle adding new indicator
+    if request.method == 'POST' and 'add_indicator' in request.POST:
+        form = IndicatorForm(request.POST)
+        if form.is_valid():
+            new_ind = form.save(commit=False)
+            new_ind.project = project
+            new_ind.added_by_student = True
+            new_ind.save()
+            return redirect('indicator_selection', project_id=project.id)
+    else:
+        form = IndicatorForm()
+
+    # Show all indicators for the project
+    indicators = project.indicators.all()
+
+    context = {
+        'project': project,
+        'form': form,
+        'indicators': indicators,
+    }
+    return render(request, 'workshops/indicator_selection.html', context)
+
+
+# Toggle accept/refuse for an indicator (AJAX-friendly POST)
+@require_POST
+def toggle_indicator_accept(request, indicator_id):
+    ind = get_object_or_404(Indicator, id=indicator_id)
+    try:
+        ind.accepted = not ind.accepted
+        ind.save()
+        return JsonResponse({'status': 'success', 'accepted': ind.accepted})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+# Phase 2: Ranking + SRF weighting
+# Accepts POST JSON: { "order": [indicator_id,...], "white_cards": {id: n, ...} }
+@require_POST
+@csrf_exempt
+def indicator_ranking_view(request, project_id):
+    """
+    Expects JSON body with:
+    {
+      "order": [id1, id2, id3, ...],
+      "white_cards": {"id1": 0, "id2": 2, ...}
+    }
+    We'll compute a simple SRF-style score:
+      - assign sequential base scores considering white cards as added gaps
+      - normalize to weights that sum to 1.0
+    """
+    project = get_object_or_404(Project, id=project_id)
+
+    try:
+        payload = json.loads(request.body)
+        order = payload.get('order', [])
+        white_cards = payload.get('white_cards', {})
+        # Validate order
+        if not isinstance(order, list):
+            return JsonResponse({'status': 'error', 'message': 'Invalid order list'}, status=400)
+
+        # Build base scores using Simos-like incremental scheme:
+        # Start with score = 1 for the topmost group, then for each next indicator:
+        # score_next = score_prev + 1 + white_cards_between
+        scores = {}
+        current_score = 1.0
+        for idx, ind_id in enumerate(order):
+            # ensure white_cards is an int 0..4
+            wb = int(white_cards.get(str(ind_id), white_cards.get(ind_id, 0) or 0))
+            if wb < 0:
+                wb = 0
+            if wb > 10:  # safety cap
+                wb = 10
+            scores[int(ind_id)] = current_score
+            # increment for next
+            current_score = current_score + 1.0 + float(wb)
+
+        # Normalize scores into weights (weights sum to 1.0)
+        total = sum(scores.values()) if scores else 0.0
+
+        # If no items, return error
+        if total == 0.0:
+            return JsonResponse({'status': 'error', 'message': 'No indicators found in order'}, status=400)
+
+        weights = {str(k): (v / total) for k, v in scores.items()}
+
+        # Save order, white_cards_after and weight in a transaction
+        with transaction.atomic():
+            for position, ind_id in enumerate(order, start=1):
+                ind = Indicator.objects.filter(project=project, id=ind_id).first()
+                if not ind:
+                    continue
+                ind.order = position
+                wc = int(white_cards.get(str(ind_id), white_cards.get(ind_id, 0) or 0))
+                ind.white_cards_after = wc
+                ind.weight = float(weights.get(str(ind_id), 0.0))
+                ind.save()
+
+        # Return computed weights for client display + CSV option
+        return JsonResponse({'status': 'success', 'weights': weights})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+# CSV download of finalized indicators
+def download_indicators_csv(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    indicators = project.indicators.filter(accepted=True).order_by('order')
+    response = HttpResponse(
+        content_type='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="project_{project_id}_indicators.csv"'},
+    )
+    writer = csv.writer(response)
+    writer.writerow(['Order', 'Indicator', 'Description', 'WhiteCardsAfter', 'Weight'])
+    for ind in indicators:
+        writer.writerow([
+            ind.order if ind.order else '',
+            ind.name,
+            ind.description or '',
+            ind.white_cards_after,
+            "{:.6f}".format(ind.weight) if ind.weight is not None else '',
+        ])
+    return response

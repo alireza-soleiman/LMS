@@ -1,0 +1,128 @@
+{# templates/workshops/indicator_ranking.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>WS3 — Indicator Ranking (SRF) — Project: {{ project.title }}</h2>
+
+  <div class="row">
+    <div class="col-md-8">
+      <p>Drag to reorder the accepted indicators (top = most important). Use the numeric dropdown to place white cards (gap) after each indicator.</p>
+
+      <ul id="rank-list" class="list-group">
+        {% for ind in indicators %}
+          {% if ind.accepted %}
+            <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ ind.id }}">
+              <span class="handle mr-2" style="cursor:grab">&#x2630;</span>
+              <div>
+                <strong>{{ ind.name }}</strong><br>
+                <small class="text-muted">{{ ind.description }}</small>
+              </div>
+              <div class="ms-3">
+                <label class="form-label small">White cards after</label>
+                <select class="form-select white-cards" style="width:100px;" data-id="{{ ind.id }}">
+                  {% for i in 0|to:4 %}
+                    <option value="{{ i }}" {% if ind.white_cards_after == i %}selected{% endif %}>{{ i }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+
+      <div class="mt-3">
+        <button id="compute-weights" class="btn btn-primary">Compute Weights (SRF)</button>
+        <a id="download-csv" href="{% url 'download_indicators_csv' project.id %}" class="btn btn-outline-secondary">Download CSV</a>
+      </div>
+
+      <div id="weights-output" class="mt-3"></div>
+    </div>
+
+    <div class="col-md-4">
+      <h5>SRF Reminder</h5>
+      <p>
+        Place white cards between criteria to express how much more important one criterion is compared to the next.
+        0 = weak (1x), 1 = moderate (2x), 2 = strong (3x), 3 = very strong (4x), 4 = extreme (5x).
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// Minimal drag-and-drop ordering (HTML5). This is intentionally small and dependency-free.
+(function(){
+  const list = document.getElementById('rank-list');
+  let dragEl = null;
+
+  list.addEventListener('dragstart', function(e){
+    dragEl = e.target;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.outerHTML);
+    e.target.classList.add('dragging');
+  }, false);
+
+  list.addEventListener('dragover', function(e){
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const target = e.target.closest('li');
+    if(target && target !== dragEl){
+      const rect = target.getBoundingClientRect();
+      const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+      list.insertBefore(dragEl, next && target.nextSibling || target);
+    }
+  }, false);
+
+  list.addEventListener('dragend', function(e){
+    e.target.classList.remove('dragging');
+    dragEl = null;
+  }, false);
+
+  // Make list items draggable
+  Array.from(list.querySelectorAll('li')).forEach(li => {
+    li.setAttribute('draggable', true);
+  });
+
+  document.getElementById('compute-weights').addEventListener('click', function(){
+    // Build order array
+    const orderEls = Array.from(list.querySelectorAll('li'));
+    const order = orderEls.map(el => parseInt(el.dataset.id, 10));
+    // White cards
+    const wc = {};
+    document.querySelectorAll('.white-cards').forEach(sel => {
+      wc[sel.dataset.id] = parseInt(sel.value, 10) || 0;
+    });
+
+    // Send payload to server
+    fetch("{% url 'indicator_ranking' project.id %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({order: order, white_cards: wc})
+    }).then(r => r.json()).then(data => {
+      if (data.status === 'success') {
+        const weights = data.weights;
+        let html = '<h5>Computed Weights</h5><table class="table table-sm"><thead><tr><th>Indicator</th><th>Weight</th></tr></thead><tbody>';
+        order.forEach(id => {
+          const w = weights[id] || weights[String(id)];
+          const name = list.querySelector('li[data-id="'+id+'"] strong').innerText;
+          html += `<tr><td>${name}</td><td>${ (w ? (parseFloat(w).toFixed(4)) : '0.0000') }</td></tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('weights-output').innerHTML = html;
+      } else {
+        alert('Error computing weights: ' + (data.message || 'unknown'));
+      }
+    }).catch(err => {
+      console.error(err);
+      alert('Network error computing weights.');
+    });
+  });
+
+})();
+</script>
+{% endblock %}
