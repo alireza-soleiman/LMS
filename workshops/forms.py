@@ -1,5 +1,5 @@
 from django import forms
-from .models import Stakeholder, Problem, Project , Objective
+from .models import Stakeholder, Problem, Project , Objective , Indicator
 
 # workshops/forms.py
 class StakeholderForm(forms.ModelForm):
@@ -50,3 +50,8 @@ class ObjectiveForm(forms.ModelForm):
         widgets = {
             'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
         }
+
+class IndicatorForm(forms.ModelForm):
+    class Meta:
+        model = Indicator
+        fields = ['name', 'description', 'accepted']

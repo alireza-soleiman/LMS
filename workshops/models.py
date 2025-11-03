@@ -95,3 +95,13 @@ class Objective(models.Model):
 
     def __str__(self):
         return self.description
+
+class Indicator(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='indicators')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    accepted = models.BooleanField(default=False)
+    added_by_student = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(null=True, blank=True)
+    white_cards_after = models.PositiveIntegerField(default=0, help_text="0=weak, 4=extreme importance gap")
+    weight = models.FloatField(null=True, blank=True)  # Normalized weight
