@@ -97,6 +97,15 @@ class Objective(models.Model):
         return self.description
 
 # workshops/models.py  (add this after Objective or at the bottom)
+class MasterIndicator(models.Model):
+    category = models.CharField(max_length=255, blank=True, null=True)
+    criterion = models.CharField(max_length=255, blank=True, null=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    unit = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return self.name
 
 class Indicator(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='indicators')
@@ -115,13 +124,4 @@ class Indicator(models.Model):
     def __str__(self):
         return self.name
 
-class MasterIndicator(models.Model):
-    category = models.CharField(max_length=255, blank=True, null=True)
-    criterion = models.CharField(max_length=255, blank=True, null=True)
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    unit = models.CharField(max_length=100, blank=True, null=True)
-
-    def __str__(self):
-        return self.name
 
