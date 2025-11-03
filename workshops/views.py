@@ -1,5 +1,5 @@
 
-from .models import Project, Problem, Stakeholder ,   Indicator
+from .models import Project, Problem, Stakeholder, Objective, Indicator, MasterIndicator
 from .forms import StakeholderForm , ProblemForm , IndicatorForm
 import csv
 import json
@@ -8,6 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
+
 
 
 def stakeholder_list(request, project_id):
@@ -227,13 +228,29 @@ def problem_tree_data(request, project_id):
     return JsonResponse(tree_data)
 
 
-
-
 # Phase 1: Indicator selection (Delphi)
 def indicator_selection_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
 
-    # Handle adding new indicator
+    # ✅ Step 1: If project has no indicators yet, copy them from MasterIndicator
+    if not project.indicators.exists():
+        master_list = MasterIndicator.objects.all()
+        bulk_create = [
+            Indicator(
+                project=project,
+                master_indicator=m,
+                name=m.name,
+                description=m.description,
+                category=m.category,
+                criterion=m.criterion,
+                unit=m.unit
+            )
+            for m in master_list
+        ]
+        Indicator.objects.bulk_create(bulk_create)
+        print(f"✅ Cloned {len(bulk_create)} indicators from MasterIndicator into Project {project.id}")
+
+    # ✅ Step 2: Handle form submission (add custom indicator)
     if request.method == 'POST' and 'add_indicator' in request.POST:
         form = IndicatorForm(request.POST)
         if form.is_valid():
@@ -245,8 +262,8 @@ def indicator_selection_view(request, project_id):
     else:
         form = IndicatorForm()
 
-    # Show all indicators for the project
-    indicators = project.indicators.all()
+    # ✅ Step 3: Get all indicators for this project (now populated)
+    indicators = project.indicators.all().order_by('category', 'criterion', 'name')
 
     context = {
         'project': project,
@@ -266,6 +283,7 @@ def toggle_indicator_accept(request, indicator_id):
         return JsonResponse({'status': 'success', 'accepted': ind.accepted})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 
 
 # Phase 2: Ranking + SRF weighting

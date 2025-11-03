@@ -13,8 +13,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"Reading Excel: {file_path}"))
 
         df = pd.read_excel(file_path, sheet_name='indicators_Original')
-
-        # Drop completely empty rows
         df = df.dropna(subset=['INDICATOR'])
 
         count = 0
