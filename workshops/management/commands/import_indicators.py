@@ -2,38 +2,49 @@ import pandas as pd
 from django.core.management.base import BaseCommand
 from workshops.models import MasterIndicator
 
+
 class Command(BaseCommand):
-    help = "Import indicators from Excel into MasterIndicator table"
+    help = "Import indicators from CSV into MasterIndicator table (auto-filling missing categories)."
 
     def add_arguments(self, parser):
-        parser.add_argument("excel_file", type=str, help="Path to Excel file")
+        parser.add_argument("csv_file", type=str, help="Path to CSV file")
 
     def handle(self, *args, **options):
-        path = options["excel_file"]
-        print(f"Reading Excel: {path}")
+        path = options["csv_file"]
+        print(f"Reading CSV: {path}")
 
-        df = pd.read_excel(path)
+        df = pd.read_csv(path)
 
-        # Fill down category and criterion columns (handles merged/blank cells)
-        df['Category'] = df['Category'].ffill()
-        df['Criterion'] = df['Criterion'].ffill()
+        # Normalize all column names
+        df.columns = [c.strip().lower() for c in df.columns]
+
+        # Debug print to verify column detection
+        print("Detected columns:", df.columns.tolist())
+
+        # Fill down blank categories and criteria
+        for col in df.columns:
+            df[col] = df[col].ffill()
 
         count = 0
         for _, row in df.iterrows():
-            category = str(row.get('Category', '')).strip()
-            name = str(row.get('Indicator name', '')).strip()
-            description = str(row.get('Description', '')).strip()
-            criterion = str(row.get('Criterion', '')).strip()
-            unit = str(row.get('Unit of measure', '')).strip()
+            category = str(row.get("category", "")).strip()
+            criterion = str(row.get("criterion", "")).strip()
+            name = str(row.get("indicator", "")).strip()
+            description = str(row.get("description", "")).strip()
+            unit = str(row.get("unit of measure", "")).strip()
+
+            # handle if the column had trailing space in name
+            if not description and "description " in df.columns:
+                description = str(row.get("description ", "")).strip()
 
             if not name:
-                continue  # skip empty rows
+                continue
 
             MasterIndicator.objects.create(
                 category=category,
+                criterion=criterion,
                 name=name,
                 description=description,
-                criterion=criterion,
                 unit=unit,
             )
             count += 1
