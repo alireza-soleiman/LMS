@@ -1,28 +1,40 @@
+import pandas as pd
 from django.core.management.base import BaseCommand
 from workshops.models import MasterIndicator
-import pandas as pd
 
 class Command(BaseCommand):
-    help = "Import indicators from Excel into MasterIndicator model"
+    help = "Import indicators from Excel into MasterIndicator table"
 
     def add_arguments(self, parser):
-        parser.add_argument('excel_file', type=str, help='Path to the Excel file')
+        parser.add_argument("excel_file", type=str, help="Path to Excel file")
 
     def handle(self, *args, **options):
-        file_path = options['excel_file']
-        self.stdout.write(self.style.SUCCESS(f"Reading Excel: {file_path}"))
+        path = options["excel_file"]
+        print(f"Reading Excel: {path}")
 
-        df = pd.read_excel(file_path, sheet_name='indicators_Original')
-        df = df.dropna(subset=['INDICATOR'])
+        df = pd.read_excel(path)
+
+        # Fill down category and criterion columns (handles merged/blank cells)
+        df['Category'] = df['Category'].ffill()
+        df['Criterion'] = df['Criterion'].ffill()
 
         count = 0
         for _, row in df.iterrows():
+            category = str(row.get('Category', '')).strip()
+            name = str(row.get('Indicator name', '')).strip()
+            description = str(row.get('Description', '')).strip()
+            criterion = str(row.get('Criterion', '')).strip()
+            unit = str(row.get('Unit of measure', '')).strip()
+
+            if not name:
+                continue  # skip empty rows
+
             MasterIndicator.objects.create(
-                category=row.get('CATEGORY', ''),
-                criterion=row.get('CRITERION', ''),
-                name=row.get('INDICATOR', ''),
-                description=row.get('DESCRIPTION', ''),
-                unit=row.get('UNIT OF MEASURE', '')
+                category=category,
+                name=name,
+                description=description,
+                criterion=criterion,
+                unit=unit,
             )
             count += 1
 
