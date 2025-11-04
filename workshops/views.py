@@ -465,3 +465,20 @@ def download_indicators_csv(request, project_id):
             "{:.6f}".format(ind.weight) if ind.weight is not None else '',
         ])
     return response
+
+
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.http import JsonResponse
+
+@csrf_exempt
+def save_indicator_selections(request, project_id):
+    if request.method == "POST":
+        data = json.loads(request.body.decode("utf-8"))
+        selected_ids = data.get("selected_ids", [])
+        # Reset all first
+        Indicator.objects.filter(project_id=project_id).update(accepted=False)
+        # Mark selected ones
+        Indicator.objects.filter(project_id=project_id, id__in=selected_ids).update(accepted=True)
+        return JsonResponse({"status": "success", "count": len(selected_ids)})
+    return JsonResponse({"status": "error", "message": "Invalid method"}, status=400)
