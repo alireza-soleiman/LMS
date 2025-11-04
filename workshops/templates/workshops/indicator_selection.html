@@ -18,12 +18,23 @@
 <div class="card mb-4 shadow-sm">
   <div class="card-body">
     <h5 class="card-title">Selected Indicators Summary</h5>
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="card-title mb-0">Selected Indicators Summary</h5>
+      <button class="btn btn-primary btn-sm" id="saveSelectionsBtn">💾 Save Selections</button>
+    </div>
+
+    <div class="text-muted small mb-2">
+      Your selections are saved locally — click “Save Selections” to finalize.
+    </div>
 
     <!-- Counter + Progress bar -->
     <div class="d-flex justify-content-between align-items-center mb-2">
       <small class="text-muted">Selected: <span id="selectedCount">0</span> / 15</small>
-      <button class="btn btn-primary btn-sm" id="saveSelectionsBtn">💾 Save Selections</button>
+      <input id="indicatorSearch" class="form-control form-control-sm" type="text" placeholder="Search indicators..." style="width: 200px;">
     </div>
+
     <div class="progress mb-3" style="height: 8px;">
       <div id="selectionProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
     </div>
@@ -35,12 +46,14 @@
           <th>Name</th>
           <th>Criterion</th>
           <th>Unit</th>
+          <th style="width:40px;"></th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 </div>
+
 
   <!-- Nested accordion view -->
     <div class="accordion" id="mainAccordion">
@@ -119,24 +132,6 @@
 </div>
 
 <script>
-function toggleAccept(indicatorId, isChecked) {
-  fetch(`/workshops/indicator/toggle/${indicatorId}/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': '{{ csrf_token }}'
-    },
-    body: JSON.stringify({ accepted: isChecked })
-  });
-}
-
-// Live search filter
-document.getElementById('searchBox').addEventListener('keyup', function() {
-  const search = this.value.toLowerCase();
-  document.querySelectorAll('#indicatorAccordion table tbody tr').forEach(row => {
-    row.style.display = row.innerText.toLowerCase().includes(search) ? '' : 'none';
-  });
-});
 document.addEventListener("DOMContentLoaded", function() {
   const checkboxes = document.querySelectorAll("input[type=checkbox][data-id]");
   const selectedTable = document.getElementById("selectedTable");
@@ -144,18 +139,19 @@ document.addEventListener("DOMContentLoaded", function() {
   const selectedCount = document.getElementById("selectedCount");
   const progressBar = document.getElementById("selectionProgress");
   const saveBtn = document.getElementById("saveSelectionsBtn");
+  const searchInput = document.getElementById("indicatorSearch");
   const maxSelect = 15;
 
-  // Local cache
   let selectedIndicators = new Map();
 
-  // Load from localStorage if exists
+  // 🔄 Load from localStorage
   const saved = localStorage.getItem("selectedIndicators");
   if (saved) {
     selectedIndicators = new Map(Object.entries(JSON.parse(saved)));
     updateUIFromCache();
   }
 
+  // ✅ Checkbox handling
   checkboxes.forEach(cb => {
     cb.addEventListener("change", () => {
       const id = cb.dataset.id;
@@ -175,27 +171,48 @@ document.addEventListener("DOMContentLoaded", function() {
         selectedIndicators.delete(id);
       }
 
-      updateSummary();
-      localStorage.setItem("selectedIndicators", JSON.stringify(Object.fromEntries(selectedIndicators)));
+      persistAndUpdate();
     });
   });
 
+  // ✅ Update summary
   function updateSummary() {
     selectedBody.innerHTML = "";
     selectedIndicators.forEach((data, id) => {
-      const row = `<tr><td>${data.name}</td><td>${data.crit}</td><td>${data.unit}</td></tr>`;
+      const row = `
+        <tr data-id="${id}">
+          <td>${data.name}</td>
+          <td>${data.crit}</td>
+          <td>${data.unit}</td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-danger remove-btn">✖</button>
+          </td>
+        </tr>`;
       selectedBody.insertAdjacentHTML("beforeend", row);
     });
 
     const count = selectedIndicators.size;
     selectedCount.textContent = count;
-    progressBar.style.width = (count / maxSelect * 100) + "%";
+
+    // 🎨 Progress color
+    const percent = (count / maxSelect) * 100;
+    progressBar.style.width = percent + "%";
+    progressBar.classList.remove("bg-success", "bg-warning", "bg-danger");
+    if (percent < 40) progressBar.classList.add("bg-success");
+    else if (percent < 80) progressBar.classList.add("bg-warning");
+    else progressBar.classList.add("bg-danger");
 
     selectedTable.style.display = count ? "table" : "none";
   }
 
+  // ✅ LocalStorage sync + UI update
+  function persistAndUpdate() {
+    localStorage.setItem("selectedIndicators", JSON.stringify(Object.fromEntries(selectedIndicators)));
+    updateSummary();
+  }
+
+  // ✅ Restore checkboxes on load
   function updateUIFromCache() {
-    // Mark checkboxes from cache
     checkboxes.forEach(cb => {
       if (selectedIndicators.has(cb.dataset.id)) {
         cb.checked = true;
@@ -204,7 +221,28 @@ document.addEventListener("DOMContentLoaded", function() {
     updateSummary();
   }
 
-  // Handle Save button
+  // ✅ Remove button inside summary table
+  selectedBody.addEventListener("click", e => {
+    if (e.target.classList.contains("remove-btn")) {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      selectedIndicators.delete(id);
+      const checkbox = document.querySelector(`input[type=checkbox][data-id="${id}"]`);
+      if (checkbox) checkbox.checked = false;
+      persistAndUpdate();
+    }
+  });
+
+  // ✅ Search filter
+  searchInput.addEventListener("input", () => {
+    const query = searchInput.value.toLowerCase();
+    document.querySelectorAll("table tbody tr").forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(query) ? "" : "none";
+    });
+  });
+
+  // ✅ Save button sends to backend
   saveBtn.addEventListener("click", () => {
     const ids = Array.from(selectedIndicators.keys());
     fetch("{% url 'save_indicator_selections' project.id %}", {
@@ -218,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function() {
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
-        alert("Selections saved successfully!");
+        alert(`Saved ${data.count} indicators successfully!`);
       } else {
         alert("Error saving selections.");
       }
@@ -226,7 +264,6 @@ document.addEventListener("DOMContentLoaded", function() {
     .catch(() => alert("Network error."));
   });
 });
-
 </script>
 
 {% endblock %}
