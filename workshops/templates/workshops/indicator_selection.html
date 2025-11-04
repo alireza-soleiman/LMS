@@ -2,7 +2,6 @@
 {% load static %}
 {% load string_extras %}
 
-
 {% block title %}Indicator Selection — {{ project.title }}{% endblock %}
 
 {% block content %}
@@ -12,111 +11,106 @@
     Browse indicators by category. Select up to <strong>15</strong> indicators that fit your project.
   </p>
 
-  <!-- Search bar -->
-  <input type="text" id="searchBox" class="form-control mb-3" placeholder="Search indicator name, criterion, or description...">
+  <!-- Summary panel -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="card-title mb-0">Selected Indicators Summary</h5>
+        <button class="btn btn-primary btn-sm" id="saveSelectionsBtn">💾 Save Selections</button>
+      </div>
 
-<div class="card mb-4 shadow-sm">
-  <div class="card-body">
-    <h5 class="card-title">Selected Indicators Summary</h5>
-<div class="card mb-4 shadow-sm">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="card-title mb-0">Selected Indicators Summary</h5>
-      <button class="btn btn-primary btn-sm" id="saveSelectionsBtn">💾 Save Selections</button>
+      <div class="text-muted small mb-2">
+        Your selections are saved locally — click “Save Selections” to finalize.
+      </div>
+
+      <!-- Counter + Progress bar -->
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <small class="text-muted">Selected: <span id="selectedCount">0</span> / 15</small>
+      </div>
+
+      <div class="progress mb-3" style="height: 8px;">
+        <div id="selectionProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+      </div>
+
+      <!-- Selected table -->
+      <table class="table table-sm table-bordered mb-0" id="selectedTable" style="display:none;">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Criterion</th>
+            <th>Unit</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
-
-    <div class="text-muted small mb-2">
-      Your selections are saved locally — click “Save Selections” to finalize.
-    </div>
-
-    <!-- Counter + Progress bar -->
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <small class="text-muted">Selected: <span id="selectedCount">0</span> / 15</small>
-      <input id="indicatorSearch" class="form-control form-control-sm" type="text" placeholder="Search indicators..." style="width: 200px;">
-    </div>
-
-    <div class="progress mb-3" style="height: 8px;">
-      <div id="selectionProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
-    </div>
-
-    <!-- Selected table -->
-    <table class="table table-sm table-bordered mb-0" id="selectedTable" style="display:none;">
-      <thead class="table-light">
-        <tr>
-          <th>Name</th>
-          <th>Criterion</th>
-          <th>Unit</th>
-          <th style="width:40px;"></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
   </div>
-</div>
-
 
   <!-- Nested accordion view -->
-    <div class="accordion" id="mainAccordion">
-  {% for main_token, main in hierarchy.items %}
-  <div class="accordion-item mb-2">
-    <h2 class="accordion-header" id="headingMain{{ forloop.counter }}">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMain{{ forloop.counter }}">
-        {{ main.full }}
-      </button>
-    </h2>
-    <div id="collapseMain{{ forloop.counter }}" class="accordion-collapse collapse">
-      <div class="accordion-body">
+  <div class="accordion" id="mainAccordion">
+    {% for main_token, main in hierarchy.items %}
+    <div class="accordion-item mb-2">
+      <h2 class="accordion-header" id="headingMain{{ forloop.counter }}">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapseMain{{ forloop.counter }}">
+          {{ main.full }}
+        </button>
+      </h2>
+      <div id="collapseMain{{ forloop.counter }}" class="accordion-collapse collapse">
+        <div class="accordion-body">
 
-        <!-- Subcategory accordion inside -->
-        <div class="accordion" id="subAccordion{{ forloop.counter }}">
-          {% for sub_token, sub in main.subs.items %}
-          <div class="accordion-item mb-1">
-            <h2 class="accordion-header" id="headingSub{{ forloop.parentloop.counter }}{{ forloop.counter }}">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSub{{ forloop.parentloop.counter }}{{ forloop.counter }}">
-                {{ sub.full }}
-              </button>
-            </h2>
-            <div id="collapseSub{{ forloop.parentloop.counter }}{{ forloop.counter }}" class="accordion-collapse collapse">
-              <div class="accordion-body p-0">
-                {% if sub.indicators %}
-                <table class="table table-striped m-0">
-                  <thead class="table-dark">
-                    <tr>
-                      <th style="width:70px;">Accept</th>
-                      <th>Indicator</th>
-                      <th>Criterion</th>
-                      <th>Description</th>
-                      <th>Unit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for ind in sub.indicators %}
-                    <tr>
-                      <td class="text-center">
-                        <input type="checkbox" data-id="{{ ind.id }}" {% if ind.accepted %}checked{% endif %} onchange="toggleAccept({{ ind.id }}, this.checked)">
-                      </td>
-                      <td>{{ ind.name }}</td>
-                      <td>{{ ind.criterion }}</td>
-                      <td>{{ ind.description|truncatewords:25 }}</td>
-                      <td>{{ ind.unit }}</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-                {% else %}
-                <div class="px-3 py-2 text-muted">No indicators under this subcategory.</div>
-                {% endif %}
+          <!-- Subcategory accordion inside -->
+          <div class="accordion" id="subAccordion{{ forloop.counter }}">
+            {% for sub_token, sub in main.subs.items %}
+            <div class="accordion-item mb-1">
+              <h2 class="accordion-header" id="headingSub{{ forloop.parentloop.counter }}{{ forloop.counter }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseSub{{ forloop.parentloop.counter }}{{ forloop.counter }}">
+                  {{ sub.full }}
+                </button>
+              </h2>
+              <div id="collapseSub{{ forloop.parentloop.counter }}{{ forloop.counter }}" class="accordion-collapse collapse">
+                <div class="accordion-body p-0">
+                  {% if sub.indicators %}
+                  <table class="table table-striped m-0">
+                    <thead class="table-dark">
+                      <tr>
+                        <th style="width:70px;">Accept</th>
+                        <th>Indicator</th>
+                        <th>Criterion</th>
+                        <th>Description</th>
+                        <th>Unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for ind in sub.indicators %}
+                      <tr>
+                        <td class="text-center">
+                          <input type="checkbox" data-id="{{ ind.id }}" {% if ind.accepted %}checked{% endif %}>
+                        </td>
+                        <td>{{ ind.name }}</td>
+                        <td>{{ ind.criterion }}</td>
+                        <td>{{ ind.description|truncatewords:25 }}</td>
+                        <td>{{ ind.unit }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                  {% else %}
+                  <div class="px-3 py-2 text-muted">No indicators under this subcategory.</div>
+                  {% endif %}
+                </div>
               </div>
             </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
 
+        </div>
       </div>
     </div>
+    {% endfor %}
   </div>
-  {% endfor %}
-</div>
 
   <hr class="my-4">
   <h5>Add a Custom Indicator</h5>
@@ -131,6 +125,7 @@
   </div>
 </div>
 
+<!-- ✅ JS Section -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
   const checkboxes = document.querySelectorAll("input[type=checkbox][data-id]");
@@ -139,7 +134,6 @@ document.addEventListener("DOMContentLoaded", function() {
   const selectedCount = document.getElementById("selectedCount");
   const progressBar = document.getElementById("selectionProgress");
   const saveBtn = document.getElementById("saveSelectionsBtn");
-  const searchInput = document.getElementById("indicatorSearch");
   const maxSelect = 15;
 
   let selectedIndicators = new Map();
@@ -233,76 +227,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
-// ✅ Smart accordion search with highlight
-searchInput.addEventListener("input", () => {
-  const query = searchInput.value.toLowerCase().trim();
-  const rows = document.querySelectorAll("table tbody tr");
-  const accordions = document.querySelectorAll(".accordion-collapse");
-  const headings = document.querySelectorAll(".accordion-button");
-
-  // Reset all highlights and visibility
-  rows.forEach(row => {
-    const text = row.innerText;
-    row.style.display = "";
-    row.innerHTML = row.innerHTML.replace(/<mark>|<\/mark>/g, "");
-  });
-
-  if (!query) {
-    // If search is empty, collapse everything and reset
-    accordions.forEach(acc => acc.classList.remove("show"));
-    headings.forEach(btn => btn.classList.add("collapsed"));
-    return;
-  }
-
-  let matchFound = false;
-
-  rows.forEach(row => {
-    const text = row.innerText.toLowerCase();
-    if (text.includes(query)) {
-      // Highlight match
-      row.innerHTML = row.innerHTML.replace(
-        new RegExp(`(${query})`, "gi"),
-        "<mark>$1</mark>"
-      );
-
-      // Ensure parent accordion expands
-      let parentCollapse = row.closest(".accordion-collapse");
-      while (parentCollapse) {
-        parentCollapse.classList.add("show");
-        const btn = document.querySelector(
-          `[data-bs-target="#${parentCollapse.id}"]`
-        );
-        if (btn) btn.classList.remove("collapsed");
-        parentCollapse = parentCollapse.closest(".accordion-collapse");
-      }
-
-      matchFound = true;
-      row.style.display = "";
-    } else {
-      row.style.display = "none";
-    }
-  });
-
-  if (!matchFound) {
-    // Optional: show “no results” message
-    if (!document.getElementById("noResultsMsg")) {
-      const msg = document.createElement("div");
-      msg.id = "noResultsMsg";
-      msg.className = "alert alert-warning mt-2";
-      msg.innerText = "No indicators found matching your search.";
-      searchInput.closest(".card-body").appendChild(msg);
-    }
-  } else {
-    const msg = document.getElementById("noResultsMsg");
-    if (msg) msg.remove();
-  }
-});
-
-
   // ✅ Save button sends to backend
+  const saveUrl = "{% url 'save_indicator_selections' project.id %}";
   saveBtn.addEventListener("click", () => {
     const ids = Array.from(selectedIndicators.keys());
-    fetch("{% url 'save_indicator_selections' project.id %}", {
+    fetch(saveUrl, {
       method: "POST",
       headers: {
         "X-CSRFToken": "{{ csrf_token }}",
@@ -322,5 +251,4 @@ searchInput.addEventListener("input", () => {
   });
 });
 </script>
-
 {% endblock %}
