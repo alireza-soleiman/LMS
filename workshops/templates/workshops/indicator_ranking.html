@@ -1,128 +1,165 @@
-{# templates/workshops/indicator_ranking.html #}
 {% extends "base.html" %}
 {% load static %}
 
+{% block title %}SRF Ranking — {{ project.title }}{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-  <h2>WS3 — Indicator Ranking (SRF) — Project: {{ project.title }}</h2>
+  <h2 class="mb-3">WS3 — SRF Method (Playing Cards)</h2>
+  <p class="text-muted">
+    Drag and drop your <strong>15 selected indicators</strong> to rank them from least to most important.
+    You can insert <em>white cards</em> to indicate stronger gaps in importance.
+  </p>
 
-  <div class="row">
-    <div class="col-md-8">
-      <p>Drag to reorder the accepted indicators (top = most important). Use the numeric dropdown to place white cards (gap) after each indicator.</p>
-
-      <ul id="rank-list" class="list-group">
-        {% for ind in indicators %}
-          {% if ind.accepted %}
-            <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ ind.id }}">
-              <span class="handle mr-2" style="cursor:grab">&#x2630;</span>
-              <div>
-                <strong>{{ ind.name }}</strong><br>
-                <small class="text-muted">{{ ind.description }}</small>
-              </div>
-              <div class="ms-3">
-                <label class="form-label small">White cards after</label>
-                <select class="form-select white-cards" style="width:100px;" data-id="{{ ind.id }}">
-                  {% for i in 0|to:4 %}
-                    <option value="{{ i }}" {% if ind.white_cards_after == i %}selected{% endif %}>{{ i }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </li>
-          {% endif %}
-        {% endfor %}
-      </ul>
-
-      <div class="mt-3">
-        <button id="compute-weights" class="btn btn-primary">Compute Weights (SRF)</button>
-        <a id="download-csv" href="{% url 'download_indicators_csv' project.id %}" class="btn btn-outline-secondary">Download CSV</a>
-      </div>
-
-      <div id="weights-output" class="mt-3"></div>
-    </div>
-
-    <div class="col-md-4">
-      <h5>SRF Reminder</h5>
-      <p>
-        Place white cards between criteria to express how much more important one criterion is compared to the next.
-        0 = weak (1x), 1 = moderate (2x), 2 = strong (3x), 3 = very strong (4x), 4 = extreme (5x).
-      </p>
-    </div>
+  <!-- Progress bar -->
+  <div class="progress mb-4" style="height: 8px;">
+    <div id="progressBar" class="progress-bar bg-primary" style="width: 0%;"></div>
   </div>
+
+  <!-- Ranking area -->
+  <div id="rankingArea" class="d-flex flex-column gap-2 mb-3">
+    {% for ind in indicators %}
+      <div class="card p-2 d-flex flex-row align-items-center justify-content-between"
+           draggable="true" data-id="{{ ind.id }}" style="cursor: move;">
+        <div>
+          <strong>{{ forloop.counter }}. {{ ind.name }}</strong><br>
+          <small class="text-muted">{{ ind.criterion }}</small>
+        </div>
+        <div>
+          <label class="me-1">White cards after:</label>
+          <input type="number" min="0" max="10" value="{{ ind.white_cards_after|default:0 }}"
+                 class="form-control form-control-sm white-input" style="width:70px; display:inline-block;">
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="d-flex justify-content-between mt-3">
+    <button id="saveBtn" class="btn btn-success">💾 Save Ranking</button>
+    <a href="{% url 'download_indicators_csv' project.id %}" class="btn btn-outline-secondary">⬇ Download CSV</a>
+  </div>
+
+  <hr>
+  <h5>Computed Weights</h5>
+  <table class="table table-sm table-striped" id="weightsTable" style="display:none;">
+    <thead class="table-dark">
+      <tr><th>#</th><th>Indicator</th><th>White Cards</th><th>Weight</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 </div>
 
 <script>
-// Minimal drag-and-drop ordering (HTML5). This is intentionally small and dependency-free.
-(function(){
-  const list = document.getElementById('rank-list');
-  let dragEl = null;
+document.addEventListener("DOMContentLoaded", () => {
+  const rankingArea = document.getElementById("rankingArea");
+  const saveBtn = document.getElementById("saveBtn");
+  const weightsTable = document.getElementById("weightsTable");
+  const weightsBody = weightsTable.querySelector("tbody");
+  const progressBar = document.getElementById("progressBar");
 
-  list.addEventListener('dragstart', function(e){
-    dragEl = e.target;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.target.outerHTML);
-    e.target.classList.add('dragging');
-  }, false);
+  let dragSrcEl = null;
 
-  list.addEventListener('dragover', function(e){
+  // 🖱 Drag & Drop sorting
+  rankingArea.addEventListener("dragstart", (e) => {
+    dragSrcEl = e.target;
+    e.dataTransfer.effectAllowed = "move";
+    e.target.classList.add("opacity-50");
+  });
+
+  rankingArea.addEventListener("dragover", (e) => e.preventDefault());
+
+  rankingArea.addEventListener("drop", (e) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const target = e.target.closest('li');
-    if(target && target !== dragEl){
-      const rect = target.getBoundingClientRect();
-      const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-      list.insertBefore(dragEl, next && target.nextSibling || target);
+    const target = e.target.closest(".card");
+    if (dragSrcEl && target && dragSrcEl !== target) {
+      const cards = Array.from(rankingArea.children);
+      const srcIndex = cards.indexOf(dragSrcEl);
+      const targetIndex = cards.indexOf(target);
+      if (srcIndex > targetIndex) rankingArea.insertBefore(dragSrcEl, target);
+      else rankingArea.insertBefore(dragSrcEl, target.nextSibling);
+      dragSrcEl.classList.remove("opacity-50");
+      updateProgress();
     }
-  }, false);
-
-  list.addEventListener('dragend', function(e){
-    e.target.classList.remove('dragging');
-    dragEl = null;
-  }, false);
-
-  // Make list items draggable
-  Array.from(list.querySelectorAll('li')).forEach(li => {
-    li.setAttribute('draggable', true);
   });
 
-  document.getElementById('compute-weights').addEventListener('click', function(){
-    // Build order array
-    const orderEls = Array.from(list.querySelectorAll('li'));
-    const order = orderEls.map(el => parseInt(el.dataset.id, 10));
-    // White cards
-    const wc = {};
-    document.querySelectorAll('.white-cards').forEach(sel => {
-      wc[sel.dataset.id] = parseInt(sel.value, 10) || 0;
-    });
+  rankingArea.addEventListener("dragend", (e) => e.target.classList.remove("opacity-50"));
 
-    // Send payload to server
-    fetch("{% url 'indicator_ranking' project.id %}", {
-      method: 'POST',
+  // ⚙️ Collect data + calculate weights
+  function getRankingData() {
+    const cards = rankingArea.querySelectorAll(".card");
+    let order = [];
+    let white_cards = {};
+    cards.forEach((card, i) => {
+      const id = card.dataset.id;
+      const wc = parseInt(card.querySelector(".white-input").value) || 0;
+      order.push(parseInt(id));
+      white_cards[id] = wc;
+    });
+    return { order, white_cards };
+  }
+
+  function updateProgress() {
+    const count = rankingArea.children.length;
+    const pct = (count / 15) * 100;
+    progressBar.style.width = pct + "%";
+  }
+
+  // 🧮 Compute weights (client-side preview)
+  function computeWeights(order, white_cards) {
+    let scores = {};
+    let current = 1;
+    order.forEach((id) => {
+      const wc = white_cards[id] || 0;
+      scores[id] = current;
+      current += 1 + wc;
+    });
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    const weights = {};
+    for (const [id, val] of Object.entries(scores)) {
+      weights[id] = (val / total).toFixed(4);
+    }
+    return weights;
+  }
+
+  // 💾 Save to backend
+  saveBtn.addEventListener("click", () => {
+    const { order, white_cards } = getRankingData();
+    const weights = computeWeights(order, white_cards);
+
+    fetch("{% url 'indicator_ranking_view' project.id %}", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': '{{ csrf_token }}',
-        'Accept': 'application/json',
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({order: order, white_cards: wc})
-    }).then(r => r.json()).then(data => {
-      if (data.status === 'success') {
-        const weights = data.weights;
-        let html = '<h5>Computed Weights</h5><table class="table table-sm"><thead><tr><th>Indicator</th><th>Weight</th></tr></thead><tbody>';
-        order.forEach(id => {
-          const w = weights[id] || weights[String(id)];
-          const name = list.querySelector('li[data-id="'+id+'"] strong').innerText;
-          html += `<tr><td>${name}</td><td>${ (w ? (parseFloat(w).toFixed(4)) : '0.0000') }</td></tr>`;
-        });
-        html += '</tbody></table>';
-        document.getElementById('weights-output').innerHTML = html;
+      body: JSON.stringify({ order, white_cards }),
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        alert("✅ Ranking saved successfully!");
+        renderWeights(weights, order, white_cards);
       } else {
-        alert('Error computing weights: ' + (data.message || 'unknown'));
+        alert("❌ Error: " + (data.message || "Unknown"));
       }
-    }).catch(err => {
-      console.error(err);
-      alert('Network error computing weights.');
-    });
+    })
+    .catch(() => alert("❌ Network error"));
   });
 
-})();
+  // 🧾 Display computed weights
+  function renderWeights(weights, order, white_cards) {
+    weightsBody.innerHTML = "";
+    order.forEach((id, i) => {
+      const name = rankingArea.querySelector(`[data-id="${id}"] strong`).innerText;
+      const wc = white_cards[id];
+      const w = weights[id];
+      const row = `<tr><td>${i+1}</td><td>${name}</td><td>${wc}</td><td>${w}</td></tr>`;
+      weightsBody.insertAdjacentHTML("beforeend", row);
+    });
+    weightsTable.style.display = "table";
+  }
+
+  updateProgress();
+});
 </script>
 {% endblock %}

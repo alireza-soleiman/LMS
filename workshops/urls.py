@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import ranking_page_view
 
 urlpatterns = [
     path('', views.workshop_list, name='workshop_list'),
@@ -15,7 +16,6 @@ urlpatterns = [
     path('project/<int:project_id>/indicators/', views.indicator_selection_view, name='indicator_selection'),
     path('project/<int:project_id>/indicators/ranking/', views.indicator_ranking_view, name='indicator_ranking'),
     path('project/<int:project_id>/indicators/download/', views.download_indicators_csv, name='download_indicators_csv'),
-# workshops/urls.py  (add near other workshop endpoints)
     path('project/<int:project_id>/indicators/', views.indicator_selection_view, name='indicator_selection'),
     path('project/<int:project_id>/indicators/ranking/', views.indicator_ranking_view, name='indicator_ranking'),
     path('project/<int:project_id>/indicators/download/', views.download_indicators_csv, name='download_indicators_csv'),
