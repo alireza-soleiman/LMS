@@ -233,14 +233,71 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
-  // ✅ Search filter
-  searchInput.addEventListener("input", () => {
-    const query = searchInput.value.toLowerCase();
-    document.querySelectorAll("table tbody tr").forEach(row => {
-      const text = row.innerText.toLowerCase();
-      row.style.display = text.includes(query) ? "" : "none";
-    });
+// ✅ Smart accordion search with highlight
+searchInput.addEventListener("input", () => {
+  const query = searchInput.value.toLowerCase().trim();
+  const rows = document.querySelectorAll("table tbody tr");
+  const accordions = document.querySelectorAll(".accordion-collapse");
+  const headings = document.querySelectorAll(".accordion-button");
+
+  // Reset all highlights and visibility
+  rows.forEach(row => {
+    const text = row.innerText;
+    row.style.display = "";
+    row.innerHTML = row.innerHTML.replace(/<mark>|<\/mark>/g, "");
   });
+
+  if (!query) {
+    // If search is empty, collapse everything and reset
+    accordions.forEach(acc => acc.classList.remove("show"));
+    headings.forEach(btn => btn.classList.add("collapsed"));
+    return;
+  }
+
+  let matchFound = false;
+
+  rows.forEach(row => {
+    const text = row.innerText.toLowerCase();
+    if (text.includes(query)) {
+      // Highlight match
+      row.innerHTML = row.innerHTML.replace(
+        new RegExp(`(${query})`, "gi"),
+        "<mark>$1</mark>"
+      );
+
+      // Ensure parent accordion expands
+      let parentCollapse = row.closest(".accordion-collapse");
+      while (parentCollapse) {
+        parentCollapse.classList.add("show");
+        const btn = document.querySelector(
+          `[data-bs-target="#${parentCollapse.id}"]`
+        );
+        if (btn) btn.classList.remove("collapsed");
+        parentCollapse = parentCollapse.closest(".accordion-collapse");
+      }
+
+      matchFound = true;
+      row.style.display = "";
+    } else {
+      row.style.display = "none";
+    }
+  });
+
+  if (!matchFound) {
+    // Optional: show “no results” message
+    if (!document.getElementById("noResultsMsg")) {
+      const msg = document.createElement("div");
+      msg.id = "noResultsMsg";
+      msg.className = "alert alert-warning mt-2";
+      msg.innerText = "No indicators found matching your search.";
+      searchInput.closest(".card-body").appendChild(msg);
+    }
+  } else {
+    const msg = document.getElementById("noResultsMsg");
+    if (msg) msg.remove();
+  }
+});
+
 
   // ✅ Save button sends to backend
   saveBtn.addEventListener("click", () => {
