@@ -8,6 +8,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
+from django.db.models import Q
+
 
 
 
@@ -264,11 +266,16 @@ def indicator_selection_view(request, project_id):
 
     # ✅ Step 3: Get all indicators for this project (now populated)
     indicators = project.indicators.all().order_by('category', 'criterion', 'name')
+    main_categories = indicators.filter(criterion__isnull=True, name__exact='').values_list('category',flat=True).distinct()
+    sub_categories = indicators.filter(criterion__isnull=False, name__exact='').order_by('category')
+    indicator_items = indicators.exclude(name__exact='').order_by('category', 'name')
 
     context = {
         'project': project,
-        'form': form,
-        'indicators': indicators,
+        'form': IndicatorForm(),
+        'main_categories': main_categories,
+        'sub_categories': sub_categories,
+        'indicator_items': indicator_items,
     }
     return render(request, 'workshops/indicator_selection.html', context)
 
