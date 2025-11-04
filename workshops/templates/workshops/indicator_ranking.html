@@ -240,6 +240,95 @@ document.addEventListener("DOMContentLoaded", () => {
   addColorPickers();
   loadCardColors();
 });
+
+// === 🧮 SRF Weight Calculation & Save ===
+document.addEventListener("DOMContentLoaded", () => {
+  const saveBtn = document.getElementById("saveBtn");
+  const summary = document.getElementById("summaryTable");
+
+  function getRankingData() {
+    const items = [...document.querySelectorAll("#board > *")];
+    const order = [];
+    const groups = [];
+
+    items.forEach(el => {
+      if (el.classList.contains("white-card")) {
+        order.push("gap");
+      } else if (el.classList.contains("group-card")) {
+        const groupIds = [...el.querySelectorAll(".srf-card")].map(c => c.dataset.id);
+        order.push(...groupIds);
+        groups.push(groupIds);
+      } else if (el.classList.contains("srf-card")) {
+        order.push(el.dataset.id);
+        groups.push([el.dataset.id]);
+      }
+    });
+
+    return { order, groups };
+  }
+
+  // Compute SRF Weights
+  function computeWeights(order, groups) {
+    let score = 1;
+    const scores = [];
+    const results = [];
+
+    for (let i = 0; i < order.length; i++) {
+      const item = order[i];
+      if (item === "gap") {
+        score += 1; // each white card = +1
+        continue;
+      }
+
+      scores.push(score);
+      results.push(item);
+      if (order[i + 1] !== "gap" && order[i + 1] !== undefined) {
+        score += 1;
+      }
+    }
+
+    const total = scores.reduce((a, b) => a + b, 0);
+    const weights = {};
+    results.forEach((id, i) => {
+      weights[id] = (scores[i] / total).toFixed(4);
+    });
+    return weights;
+  }
+
+  saveBtn.addEventListener("click", () => {
+    const { order, groups } = getRankingData();
+    const weights = computeWeights(order, groups);
+
+    // Display summary
+    summary.innerHTML = `
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>Indicator ID</th><th>Weight</th></tr></thead>
+        <tbody>
+          ${Object.entries(weights)
+            .map(([id, w]) => `<tr><td>${id}</td><td>${w}</td></tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    `;
+
+    // Send to backend
+    fetch("{% url 'indicator_ranking_view' project.id %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ order, groups }),
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") alert("Weights saved successfully!");
+      else alert("Error saving: " + data.message);
+    })
+    .catch(err => alert("Network error: " + err));
+  });
+});
+
 </script>
 
 {% endblock %}
