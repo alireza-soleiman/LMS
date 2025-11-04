@@ -21,6 +21,8 @@ urlpatterns = [
     path('project/<int:project_id>/indicators/download/', views.download_indicators_csv, name='download_indicators_csv'),
     path('indicator/toggle/<int:indicator_id>/', views.toggle_indicator_accept, name='toggle_indicator_accept'),
     path("project/<int:project_id>/indicators/save/", views.save_indicator_selections, name="save_indicator_selections"),
+    path('project/<int:project_id>/ranking/', ranking_page_view, name='indicator_ranking'),
+
 
 
 
