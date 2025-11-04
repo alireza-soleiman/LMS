@@ -1,130 +1,166 @@
 {% extends "base.html" %}
 {% load static %}
-
-{% block title %}SRF Ranking — {{ project.title }}{% endblock %}
+{% block title %}SRF Playing Cards — {{ project.title }}{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h2 class="mb-3">WS3 — SRF Method (Playing Cards)</h2>
-  <p class="text-muted">
-    Drag and drop your <strong>15 selected indicators</strong> to rank them from least to most important.
-    You can insert <em>white cards</em> to indicate stronger gaps in importance.
-  </p>
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-lg-8">
+      <h3>🎴 SRF Method — Playing Cards</h3>
+      <p class="text-muted">Drag indicators into order and use “white cards” to represent importance gaps.</p>
 
-  <!-- Progress bar -->
-  <div class="progress mb-4" style="height: 8px;">
-    <div id="progressBar" class="progress-bar bg-primary" style="width: 0%;"></div>
-  </div>
-
-  <!-- Ranking area -->
-  <div id="rankingArea" class="d-flex flex-column gap-2 mb-3">
-    {% for ind in indicators %}
-      <div class="card p-2 d-flex flex-row align-items-center justify-content-between"
-           draggable="true" data-id="{{ ind.id }}" style="cursor: move;">
-        <div>
-          <strong>{{ forloop.counter }}. {{ ind.name }}</strong><br>
-          <small class="text-muted">{{ ind.criterion }}</small>
+      <div id="board" class="p-3 bg-light rounded shadow-sm d-flex flex-column gap-3">
+        {% for ind in indicators %}
+        <div class="card srf-card" data-id="{{ ind.id }}">
+          <div class="card-body p-2">
+            <h6 class="mb-1">{{ ind.name }}</h6>
+            <small class="text-muted">{{ ind.criterion }}</small><br>
+            <small>{{ ind.description|truncatewords:10 }}</small>
+          </div>
         </div>
-        <div>
-          <label class="me-1">White cards after:</label>
-          <input type="number" min="0" max="10" value="{{ ind.white_cards_after|default:0 }}"
-                 class="form-control form-control-sm white-input" style="width:70px; display:inline-block;">
+        {% endfor %}
+      </div>
+
+      <div class="text-center mt-3">
+        <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">➕ Add White Card (Gap)</button>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">💡 SRF Weight Summary</h5>
+          <div id="summaryTable" class="small"></div>
+          <button id="saveBtn" class="btn btn-primary w-100 mt-3">💾 Save SRF Weights</button>
         </div>
       </div>
-    {% endfor %}
+    </div>
   </div>
-
-  <div class="d-flex justify-content-between mt-3">
-    <button id="saveBtn" class="btn btn-success">💾 Save Ranking</button>
-    <a href="{% url 'download_indicators_csv' project.id %}" class="btn btn-outline-secondary">⬇ Download CSV</a>
-  </div>
-
-  <hr>
-  <h5>Computed Weights</h5>
-  <table class="table table-sm table-striped" id="weightsTable" style="display:none;">
-    <thead class="table-dark">
-      <tr><th>#</th><th>Indicator</th><th>White Cards</th><th>Weight</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
 </div>
+
+<style>
+
+  .srf-card {
+    cursor: grab;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    background: white;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .srf-card.dragging {
+    opacity: 0.6;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  }
+  .white-card {
+    background: repeating-linear-gradient(
+      45deg, #fff, #fff 10px, #f0f0f0 10px, #f0f0f0 20px
+    );
+    border: 2px dashed #bbb;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+  }
+
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const rankingArea = document.getElementById("rankingArea");
+  const board = document.getElementById("board");
   const saveBtn = document.getElementById("saveBtn");
-  const weightsTable = document.getElementById("weightsTable");
-  const weightsBody = weightsTable.querySelector("tbody");
-  const progressBar = document.getElementById("progressBar");
+  const summaryTable = document.getElementById("summaryTable");
+  const addWhiteCardBtn = document.getElementById("addWhiteCard");
 
-  let dragSrcEl = null;
+  // Make all cards draggable
+  function makeDraggable(el) {
+    el.setAttribute("draggable", "true");
+  }
 
-  // 🖱 Drag & Drop sorting
-  rankingArea.addEventListener("dragstart", (e) => {
-    dragSrcEl = e.target;
-    e.dataTransfer.effectAllowed = "move";
-    e.target.classList.add("opacity-50");
+  board.querySelectorAll(".srf-card").forEach(makeDraggable);
+
+  let dragged = null;
+
+  // --- Drag start / end ---
+  board.addEventListener("dragstart", e => {
+    if (e.target.matches(".srf-card, .white-card")) {
+      dragged = e.target;
+      e.target.classList.add("dragging");
+    }
   });
 
-  rankingArea.addEventListener("dragover", (e) => e.preventDefault());
+  board.addEventListener("dragend", e => {
+    if (dragged) dragged.classList.remove("dragging");
+    dragged = null;
+    updateSummary();
+  });
 
-  rankingArea.addEventListener("drop", (e) => {
+  // --- Drag over handling ---
+  board.addEventListener("dragover", e => {
     e.preventDefault();
-    const target = e.target.closest(".card");
-    if (dragSrcEl && target && dragSrcEl !== target) {
-      const cards = Array.from(rankingArea.children);
-      const srcIndex = cards.indexOf(dragSrcEl);
-      const targetIndex = cards.indexOf(target);
-      if (srcIndex > targetIndex) rankingArea.insertBefore(dragSrcEl, target);
-      else rankingArea.insertBefore(dragSrcEl, target.nextSibling);
-      dragSrcEl.classList.remove("opacity-50");
-      updateProgress();
-    }
+    const afterElement = getDragAfterElement(board, e.clientY);
+    if (afterElement == null) board.appendChild(dragged);
+    else board.insertBefore(dragged, afterElement);
   });
 
-  rankingArea.addEventListener("dragend", (e) => e.target.classList.remove("opacity-50"));
+  function getDragAfterElement(container, y) {
+    const els = [...container.querySelectorAll(".srf-card:not(.dragging), .white-card:not(.dragging)")];
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
 
-  // ⚙️ Collect data + calculate weights
-  function getRankingData() {
-    const cards = rankingArea.querySelectorAll(".card");
-    let order = [];
-    let white_cards = {};
-    cards.forEach((card, i) => {
-      const id = card.dataset.id;
-      const wc = parseInt(card.querySelector(".white-input").value) || 0;
-      order.push(parseInt(id));
-      white_cards[id] = wc;
+  // --- Add draggable white card ---
+  addWhiteCardBtn.addEventListener("click", () => {
+    const white = document.createElement("div");
+    white.className = "white-card";
+    white.textContent = "⬜ White Card (Gap)";
+    makeDraggable(white);
+    board.appendChild(white);
+    updateSummary();
+  });
+
+  // --- Update summary panel ---
+  function updateSummary() {
+    const cards = board.querySelectorAll(".srf-card, .white-card");
+    let html = "<ul class='list-group list-group-flush'>";
+    let rank = 1;
+    cards.forEach((el) => {
+      if (el.classList.contains("srf-card")) {
+        html += `<li class='list-group-item small'>${rank++}. ${el.querySelector("h6").textContent}</li>`;
+      } else {
+        html += `<li class='list-group-item text-center text-muted'>⬜ Gap (White Card)</li>`;
+      }
     });
-    return { order, white_cards };
+    html += "</ul>";
+    summaryTable.innerHTML = html;
   }
 
-  function updateProgress() {
-    const count = rankingArea.children.length;
-    const pct = (count / 15) * 100;
-    progressBar.style.width = pct + "%";
-  }
+  updateSummary();
 
-  // 🧮 Compute weights (client-side preview)
-  function computeWeights(order, white_cards) {
-    let scores = {};
-    let current = 1;
-    order.forEach((id) => {
-      const wc = white_cards[id] || 0;
-      scores[id] = current;
-      current += 1 + wc;
-    });
-    const total = Object.values(scores).reduce((a, b) => a + b, 0);
-    const weights = {};
-    for (const [id, val] of Object.entries(scores)) {
-      weights[id] = (val / total).toFixed(4);
-    }
-    return weights;
-  }
-
-  // 💾 Save to backend
+  // --- Save SRF data ---
   saveBtn.addEventListener("click", () => {
-    const { order, white_cards } = getRankingData();
-    const weights = computeWeights(order, white_cards);
+    const cards = board.querySelectorAll(".srf-card, .white-card");
+    const order = [];
+    const white_cards = {};
+    let lastIndicator = null;
+    let gapCount = 0;
+
+    cards.forEach((el) => {
+      if (el.classList.contains("white-card")) {
+        gapCount++;
+      } else if (el.classList.contains("srf-card")) {
+        const id = el.dataset.id;
+        if (lastIndicator) white_cards[lastIndicator] = gapCount;
+        gapCount = 0;
+        order.push(id);
+        lastIndicator = id;
+      }
+    });
 
     fetch("{% url 'indicator_ranking_view' project.id %}", {
       method: "POST",
@@ -134,32 +170,15 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       body: JSON.stringify({ order, white_cards }),
     })
-    .then(res => res.json())
+    .then(r => r.json())
     .then(data => {
-      if (data.status === "success") {
-        alert("✅ Ranking saved successfully!");
-        renderWeights(weights, order, white_cards);
-      } else {
-        alert("❌ Error: " + (data.message || "Unknown"));
-      }
+      if (data.status === "success") alert("SRF weights saved successfully!");
+      else alert("Error: " + (data.message || "Unknown"));
     })
-    .catch(() => alert("❌ Network error"));
+    .catch(() => alert("Network error."));
   });
-
-  // 🧾 Display computed weights
-  function renderWeights(weights, order, white_cards) {
-    weightsBody.innerHTML = "";
-    order.forEach((id, i) => {
-      const name = rankingArea.querySelector(`[data-id="${id}"] strong`).innerText;
-      const wc = white_cards[id];
-      const w = weights[id];
-      const row = `<tr><td>${i+1}</td><td>${name}</td><td>${wc}</td><td>${w}</td></tr>`;
-      weightsBody.insertAdjacentHTML("beforeend", row);
-    });
-    weightsTable.style.display = "table";
-  }
-
-  updateProgress();
 });
 </script>
+
+
 {% endblock %}
