@@ -377,6 +377,16 @@ def toggle_indicator_accept(request, indicator_id):
 
 # Phase 2: Ranking + SRF weighting
 # Accepts POST JSON: { "order": [indicator_id,...], "white_cards": {id: n, ...} }
+
+def ranking_page_view(request, project_id):
+    """Render the SRF Playing Cards interface."""
+    project = get_object_or_404(Project, id=project_id)
+    indicators = project.indicators.filter(accepted=True).order_by('order', 'id')[:15]
+    return render(request, 'workshops/indicator_ranking.html', {
+        'project': project,
+        'indicators': indicators
+    })
+
 @require_POST
 @csrf_exempt
 def indicator_ranking_view(request, project_id):
