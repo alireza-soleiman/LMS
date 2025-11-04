@@ -137,6 +137,96 @@ document.getElementById('searchBox').addEventListener('keyup', function() {
     row.style.display = row.innerText.toLowerCase().includes(search) ? '' : 'none';
   });
 });
+document.addEventListener("DOMContentLoaded", function() {
+  const checkboxes = document.querySelectorAll("input[type=checkbox][data-id]");
+  const selectedTable = document.getElementById("selectedTable");
+  const selectedBody = selectedTable.querySelector("tbody");
+  const selectedCount = document.getElementById("selectedCount");
+  const progressBar = document.getElementById("selectionProgress");
+  const saveBtn = document.getElementById("saveSelectionsBtn");
+  const maxSelect = 15;
+
+  // Local cache
+  let selectedIndicators = new Map();
+
+  // Load from localStorage if exists
+  const saved = localStorage.getItem("selectedIndicators");
+  if (saved) {
+    selectedIndicators = new Map(Object.entries(JSON.parse(saved)));
+    updateUIFromCache();
+  }
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.id;
+      const row = cb.closest("tr");
+      const name = row.children[1].innerText;
+      const crit = row.children[2].innerText;
+      const unit = row.children[4].innerText;
+
+      if (cb.checked) {
+        if (selectedIndicators.size >= maxSelect) {
+          alert("You can select up to 15 indicators only.");
+          cb.checked = false;
+          return;
+        }
+        selectedIndicators.set(id, { name, crit, unit });
+      } else {
+        selectedIndicators.delete(id);
+      }
+
+      updateSummary();
+      localStorage.setItem("selectedIndicators", JSON.stringify(Object.fromEntries(selectedIndicators)));
+    });
+  });
+
+  function updateSummary() {
+    selectedBody.innerHTML = "";
+    selectedIndicators.forEach((data, id) => {
+      const row = `<tr><td>${data.name}</td><td>${data.crit}</td><td>${data.unit}</td></tr>`;
+      selectedBody.insertAdjacentHTML("beforeend", row);
+    });
+
+    const count = selectedIndicators.size;
+    selectedCount.textContent = count;
+    progressBar.style.width = (count / maxSelect * 100) + "%";
+
+    selectedTable.style.display = count ? "table" : "none";
+  }
+
+  function updateUIFromCache() {
+    // Mark checkboxes from cache
+    checkboxes.forEach(cb => {
+      if (selectedIndicators.has(cb.dataset.id)) {
+        cb.checked = true;
+      }
+    });
+    updateSummary();
+  }
+
+  // Handle Save button
+  saveBtn.addEventListener("click", () => {
+    const ids = Array.from(selectedIndicators.keys());
+    fetch("{% url 'save_indicator_selections' project.id %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ selected_ids: ids }),
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        alert("Selections saved successfully!");
+      } else {
+        alert("Error saving selections.");
+      }
+    })
+    .catch(() => alert("Network error."));
+  });
+});
+
 </script>
 
 {% endblock %}
