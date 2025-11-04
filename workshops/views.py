@@ -234,10 +234,10 @@ def problem_tree_data(request, project_id):
 def indicator_selection_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
 
-    # ✅ Step 1: If project has no indicators yet, copy them from MasterIndicator
+    # ✅ Step 1: Clone indicators from MasterIndicator if this project has none yet
     if not project.indicators.exists():
         master_list = MasterIndicator.objects.all()
-        bulk_create = [
+        indicators_to_create = [
             Indicator(
                 project=project,
                 master_indicator=m,
@@ -245,39 +245,63 @@ def indicator_selection_view(request, project_id):
                 description=m.description,
                 category=m.category,
                 criterion=m.criterion,
-                unit=m.unit
+                unit=m.unit,
             )
             for m in master_list
         ]
-        Indicator.objects.bulk_create(bulk_create)
-        print(f"✅ Cloned {len(bulk_create)} indicators from MasterIndicator into Project {project.id}")
+        Indicator.objects.bulk_create(indicators_to_create)
+        print(f"✅ Cloned {len(indicators_to_create)} indicators into project {project.id}")
 
-    # ✅ Step 2: Handle form submission (add custom indicator)
-    if request.method == 'POST' and 'add_indicator' in request.POST:
+    # ✅ Step 2: Handle “add custom indicator” form submission
+    if request.method == "POST" and "add_indicator" in request.POST:
         form = IndicatorForm(request.POST)
         if form.is_valid():
             new_ind = form.save(commit=False)
             new_ind.project = project
             new_ind.added_by_student = True
             new_ind.save()
-            return redirect('indicator_selection', project_id=project.id)
+            return redirect("indicator_selection", project_id=project.id)
     else:
         form = IndicatorForm()
 
-    # ✅ Step 3: Get all indicators for this project (now populated)
-    indicators = project.indicators.all().order_by('category', 'criterion', 'name')
-    main_categories = indicators.filter(criterion__isnull=True, name__exact='').values_list('category',flat=True).distinct()
-    sub_categories = indicators.filter(criterion__isnull=False, name__exact='').order_by('category')
-    indicator_items = indicators.exclude(name__exact='').order_by('category', 'name')
+    # ✅ Step 3: Prepare indicator hierarchy
+    indicators = project.indicators.all().order_by("category", "name")
+
+    # Detect main categories (A., B., C., …)
+    main_categories = sorted(
+        {
+            cat
+            for cat in indicators.values_list("category", flat=True)
+            if cat and not cat.split()[0][0].isdigit() and "." in cat.split()[0] and cat.split()[0].count(".") == 1
+        }
+        | {
+            cat
+            for cat in indicators.values_list("category", flat=True)
+            if cat and cat[0].isalpha() and cat.startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and "." in cat
+        }
+    )
+
+    # Detect subcategories (A1., A2., …)
+    sub_categories = sorted(
+        {
+            cat
+            for cat in indicators.values_list("category", flat=True)
+            if cat and any(ch.isdigit() for ch in cat.split()[0]) and cat.split()[0].count(".") == 1
+        }
+    )
+
+    # All indicators (A1.1, A2.3, …)
+    indicator_items = indicators.exclude(name__exact="").order_by("category", "name")
 
     context = {
-        'project': project,
-        'form': IndicatorForm(),
-        'main_categories': main_categories,
-        'sub_categories': sub_categories,
-        'indicator_items': indicator_items,
+        "project": project,
+        "form": form,
+        "main_categories": main_categories,
+        "sub_categories": sub_categories,
+        "indicator_items": indicator_items,
     }
-    return render(request, 'workshops/indicator_selection.html', context)
+
+    return render(request, "workshops/indicator_selection.html", context)
 
 
 # Toggle accept/refuse for an indicator (AJAX-friendly POST)
