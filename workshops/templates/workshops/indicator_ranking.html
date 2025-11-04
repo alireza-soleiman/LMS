@@ -7,8 +7,19 @@
   <div class="row">
     <div class="col-lg-8">
       <h3>🎴 SRF Method — Playing Cards</h3>
-      <p class="text-muted">Drag indicators into order and use “white cards” to represent importance gaps.</p>
+      <p class="text-muted">
+        Drag the indicator cards to rank them by importance.
+        Add white cards to show importance gaps.
+        You can also merge indicators with equal importance.
+      </p>
 
+      <!-- 🎯 Buttons -->
+      <div class="text-center mb-3">
+        <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">⬜ Add White Card (Gap)</button>
+        <button id="mergeCards" class="btn btn-outline-primary btn-sm">🔗 Merge Selected (Equal Importance)</button>
+      </div>
+
+      <!-- 🎴 Main board -->
       <div id="board" class="p-3 bg-light rounded shadow-sm d-flex flex-column gap-3">
         {% for ind in indicators %}
         <div class="card srf-card" data-id="{{ ind.id }}">
@@ -20,12 +31,9 @@
         </div>
         {% endfor %}
       </div>
-
-      <div class="text-center mt-3">
-        <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">➕ Add White Card (Gap)</button>
-      </div>
     </div>
 
+    <!-- 💡 Right panel -->
     <div class="col-lg-4">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -38,144 +46,119 @@
   </div>
 </div>
 
+<!-- 🎨 Styles -->
 <style>
-
-  .srf-card {
-    cursor: grab;
-    border: 2px solid #ddd;
-    border-radius: 12px;
-    background: white;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .srf-card.dragging {
-    opacity: 0.6;
-    transform: scale(1.05);
-    box-shadow: 0 0 10px rgba(0,0,0,0.2);
-  }
-  .white-card {
-    background: repeating-linear-gradient(
-      45deg, #fff, #fff 10px, #f0f0f0 10px, #f0f0f0 20px
-    );
-    border: 2px dashed #bbb;
-    height: 50px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #777;
-  }
-
+#board {
+  min-height: 300px;
+}
+.srf-card {
+  cursor: grab;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.15s ease;
+}
+.srf-card.dragging {
+  opacity: 0.6;
+  transform: scale(1.05);
+}
+.white-card {
+  text-align: center;
+  padding: 10px;
+  border: 2px dashed #aaa;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    45deg,
+    #fff,
+    #fff 10px,
+    #f0f0f0 10px,
+    #f0f0f0 20px
+  );
+  cursor: grab;
+}
+.group-card {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 2px solid #aaa;
+  border-radius: 10px;
+  padding: 6px;
+  background: #f9f9f9;
+}
+.srf-card.selected {
+  border-color: #007bff;
+  box-shadow: 0 0 6px #007bff;
+}
 </style>
+
+<!-- 📦 SortableJS -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const board = document.getElementById("board");
-  const saveBtn = document.getElementById("saveBtn");
-  const summaryTable = document.getElementById("summaryTable");
-  const addWhiteCardBtn = document.getElementById("addWhiteCard");
+  const addWhiteBtn = document.getElementById("addWhiteCard");
+  const mergeBtn = document.getElementById("mergeCards");
 
-  // Make all cards draggable
-  function makeDraggable(el) {
-    el.setAttribute("draggable", "true");
-  }
-
-  board.querySelectorAll(".srf-card").forEach(makeDraggable);
-
-  let dragged = null;
-
-  // --- Drag start / end ---
-  board.addEventListener("dragstart", e => {
-    if (e.target.matches(".srf-card, .white-card")) {
-      dragged = e.target;
-      e.target.classList.add("dragging");
-    }
+  // ✅ Enable main drag-and-drop
+  Sortable.create(board, {
+    animation: 150,
+    ghostClass: 'dragging',
+    handle: '.srf-card, .white-card, .group-card',
   });
 
-  board.addEventListener("dragend", e => {
-    if (dragged) dragged.classList.remove("dragging");
-    dragged = null;
-    updateSummary();
-  });
-
-  // --- Drag over handling ---
-  board.addEventListener("dragover", e => {
-    e.preventDefault();
-    const afterElement = getDragAfterElement(board, e.clientY);
-    if (afterElement == null) board.appendChild(dragged);
-    else board.insertBefore(dragged, afterElement);
-  });
-
-  function getDragAfterElement(container, y) {
-    const els = [...container.querySelectorAll(".srf-card:not(.dragging), .white-card:not(.dragging)")];
-    return els.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
-
-  // --- Add draggable white card ---
-  addWhiteCardBtn.addEventListener("click", () => {
+  // ✅ Add white card
+  addWhiteBtn.addEventListener("click", () => {
     const white = document.createElement("div");
     white.className = "white-card";
     white.textContent = "⬜ White Card (Gap)";
-    makeDraggable(white);
     board.appendChild(white);
-    updateSummary();
   });
 
-  // --- Update summary panel ---
-  function updateSummary() {
-    const cards = board.querySelectorAll(".srf-card, .white-card");
-    let html = "<ul class='list-group list-group-flush'>";
-    let rank = 1;
-    cards.forEach((el) => {
-      if (el.classList.contains("srf-card")) {
-        html += `<li class='list-group-item small'>${rank++}. ${el.querySelector("h6").textContent}</li>`;
-      } else {
-        html += `<li class='list-group-item text-center text-muted'>⬜ Gap (White Card)</li>`;
-      }
-    });
-    html += "</ul>";
-    summaryTable.innerHTML = html;
-  }
+  // ✅ Select indicator cards by clicking
+  board.addEventListener("click", e => {
+    const card = e.target.closest(".srf-card");
+    if (!card) return;
+    card.classList.toggle("selected");
+  });
 
-  updateSummary();
+  // ✅ Merge selected indicator cards into one draggable group
+  mergeBtn.addEventListener("click", () => {
+    const selected = [...board.querySelectorAll(".srf-card.selected")];
+    if (selected.length < 2) {
+      alert("Select at least 2 indicator cards to merge!");
+      return;
+    }
 
-  // --- Save SRF data ---
-  saveBtn.addEventListener("click", () => {
-    const cards = board.querySelectorAll(".srf-card, .white-card");
-    const order = [];
-    const white_cards = {};
-    let lastIndicator = null;
-    let gapCount = 0;
+    // Create the group container
+    const group = document.createElement("div");
+    group.className = "group-card";
+    group.innerHTML = `<div class="text-muted small mb-1">⚖️ Equal Importance Group</div>`;
 
-    cards.forEach((el) => {
-      if (el.classList.contains("white-card")) {
-        gapCount++;
-      } else if (el.classList.contains("srf-card")) {
-        const id = el.dataset.id;
-        if (lastIndicator) white_cards[lastIndicator] = gapCount;
-        gapCount = 0;
-        order.push(id);
-        lastIndicator = id;
-      }
+    // Determine where to insert the group (before the first selected card)
+    const first = selected[0];
+    board.insertBefore(group, first);
+
+    // Move selected cards into the group
+    selected.forEach(card => {
+      card.classList.remove("selected");
+      group.appendChild(card);
     });
 
-    fetch("{% url 'indicator_ranking_view' project.id %}", {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": "{{ csrf_token }}",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ order, white_cards }),
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === "success") alert("SRF weights saved successfully!");
-      else alert("Error: " + (data.message || "Unknown"));
-    })
-    .catch(() => alert("Network error."));
+    // Make the group itself draggable
+    Sortable.create(group, {
+      group: "shared",
+      animation: 150,
+      handle: '.srf-card',
+    });
+  });
+
+  // ✅ Make the board sortable after groups exist
+  Sortable.create(board, {
+    animation: 150,
+    handle: '.srf-card, .white-card, .group-card',
+    ghostClass: 'dragging',
   });
 });
 </script>
