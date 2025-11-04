@@ -125,3 +125,13 @@ class Indicator(models.Model):
         return self.name
 
 
+# workshops/models.py
+class IndicatorRanking(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='rankings')
+    indicator = models.ForeignKey(Indicator, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()
+    weight = models.FloatField(default=0.0)
+    white_cards_after = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['position']
