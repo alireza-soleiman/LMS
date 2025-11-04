@@ -7,11 +7,28 @@
   <div class="row">
     <div class="col-lg-8">
       <h3>🎴 SRF Method — Playing Cards</h3>
-      <p class="text-muted">
-        Drag the indicator cards to rank them by importance.
-        Add white cards to show importance gaps.
-        You can also merge indicators with equal importance.
-      </p>
+    <hr class="my-4">
+<div class="alert alert-info">
+  <h5>🧩 How the SRF (Simos) Method Works</h5>
+  <p>
+    In this step, you <strong>rank indicators</strong> by dragging their cards from top (most important)
+    to bottom (least important). If two indicators are equally important,
+    <strong>merge them into a group</strong> using “🔗 Merge Selected”.
+  </p>
+  <p>
+    Use <strong>⬜ White Cards</strong> to show importance gaps between groups.
+    Each white card represents a step increase in perceived importance.
+  </p>
+  <p>
+    When you click <strong>💾 Save SRF Weights</strong>, the system calculates weights automatically:
+    it assigns scores based on your order and gaps, then normalizes them so total weight = 1.0.
+  </p>
+  <p class="mb-0">
+    This method is part of the <em>Revised Simos procedure</em> (SRF),
+    often used in Multi-Criteria Decision Making (MCDM) to turn subjective rankings into quantitative weights.
+  </p>
+</div>
+
 
       <!-- 🎯 Buttons -->
       <div class="text-center mb-3">
@@ -32,6 +49,7 @@
         {% endfor %}
       </div>
     </div>
+
 
     <!-- 💡 Right panel -->
     <div class="col-lg-4">
@@ -240,14 +258,16 @@ document.addEventListener("DOMContentLoaded", () => {
   addColorPickers();
   loadCardColors();
 });
+<!-- === 🧮 SRF Weight Calculation & Save === -->
 
-// === 🧮 SRF Weight Calculation & Save ===
 document.addEventListener("DOMContentLoaded", () => {
   const saveBtn = document.getElementById("saveBtn");
   const summary = document.getElementById("summaryTable");
+  const board = document.getElementById("board");
 
+  // 🔍 Gather order + groups from the visual board
   function getRankingData() {
-    const items = [...document.querySelectorAll("#board > *")];
+    const items = [...board.children];
     const order = [];
     const groups = [];
 
@@ -267,21 +287,20 @@ document.addEventListener("DOMContentLoaded", () => {
     return { order, groups };
   }
 
-  // Compute SRF Weights
+  // 📊 Compute SRF-style weights
   function computeWeights(order, groups) {
     let score = 1;
     const scores = [];
-    const results = [];
+    const resultIds = [];
 
     for (let i = 0; i < order.length; i++) {
       const item = order[i];
       if (item === "gap") {
-        score += 1; // each white card = +1
+        score += 1; // each white card adds a gap
         continue;
       }
-
       scores.push(score);
-      results.push(item);
+      resultIds.push(item);
       if (order[i + 1] !== "gap" && order[i + 1] !== undefined) {
         score += 1;
       }
@@ -289,29 +308,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const total = scores.reduce((a, b) => a + b, 0);
     const weights = {};
-    results.forEach((id, i) => {
+    resultIds.forEach((id, i) => {
       weights[id] = (scores[i] / total).toFixed(4);
     });
     return weights;
   }
 
+  // 🧾 Display weights with indicator names
+  function renderSummary(weights) {
+    const rows = Object.entries(weights)
+      .map(([id, w]) => {
+        const card = document.querySelector(`.srf-card[data-id="${id}"]`);
+        const name = card ? card.querySelector("h6").innerText : `Indicator ${id}`;
+        return `<tr><td>${name}</td><td>${w}</td></tr>`;
+      })
+      .join("");
+
+    summary.innerHTML = `
+      <h6 class="mb-2">📊 Computed SRF Weights</h6>
+      <table class="table table-sm table-bordered">
+        <thead class="table-light">
+          <tr><th>Indicator</th><th>Weight</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="text-muted small mt-2">
+        Total = 1.0000 (normalized). Higher weight → higher importance.
+      </p>
+    `;
+  }
+
+  // 💾 Save & compute weights
   saveBtn.addEventListener("click", () => {
     const { order, groups } = getRankingData();
     const weights = computeWeights(order, groups);
+    renderSummary(weights);
 
-    // Display summary
-    summary.innerHTML = `
-      <table class="table table-sm table-bordered">
-        <thead><tr><th>Indicator ID</th><th>Weight</th></tr></thead>
-        <tbody>
-          ${Object.entries(weights)
-            .map(([id, w]) => `<tr><td>${id}</td><td>${w}</td></tr>`)
-            .join("")}
-        </tbody>
-      </table>
-    `;
-
-    // Send to backend
     fetch("{% url 'indicator_ranking_view' project.id %}", {
       method: "POST",
       headers: {
@@ -320,14 +352,18 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       body: JSON.stringify({ order, groups }),
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "success") alert("Weights saved successfully!");
-      else alert("Error saving: " + data.message);
-    })
-    .catch(err => alert("Network error: " + err));
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "success") {
+          alert("✅ SRF weights calculated and saved successfully!");
+        } else {
+          alert("⚠️ Error saving weights: " + data.message);
+        }
+      })
+      .catch(err => alert("❌ Network error: " + err));
   });
 });
+
 
 </script>
 
