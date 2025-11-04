@@ -91,9 +91,9 @@
   box-shadow: 0 0 6px #007bff;
 }
 </style>
-
-<!-- 📦 SortableJS -->
+<!-- 📦 SortableJS + html2canvas -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const addWhiteBtn = document.getElementById("addWhiteCard");
   const mergeBtn = document.getElementById("mergeCards");
 
-  // ✅ Enable main drag-and-drop
+  // ✅ Enable drag and drop
   Sortable.create(board, {
     animation: 150,
     ghostClass: 'dragging',
@@ -116,14 +116,14 @@ document.addEventListener("DOMContentLoaded", () => {
     board.appendChild(white);
   });
 
-  // ✅ Select indicator cards by clicking
+  // ✅ Select cards by clicking
   board.addEventListener("click", e => {
     const card = e.target.closest(".srf-card");
     if (!card) return;
     card.classList.toggle("selected");
   });
 
-  // ✅ Merge selected indicator cards into one draggable group
+  // ✅ Merge selected indicator cards
   mergeBtn.addEventListener("click", () => {
     const selected = [...board.querySelectorAll(".srf-card.selected")];
     if (selected.length < 2) {
@@ -131,22 +131,17 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Create the group container
     const group = document.createElement("div");
     group.className = "group-card";
     group.innerHTML = `<div class="text-muted small mb-1">⚖️ Equal Importance Group</div>`;
 
-    // Determine where to insert the group (before the first selected card)
     const first = selected[0];
     board.insertBefore(group, first);
-
-    // Move selected cards into the group
     selected.forEach(card => {
       card.classList.remove("selected");
       group.appendChild(card);
     });
 
-    // Make the group itself draggable
     Sortable.create(group, {
       group: "shared",
       animation: 150,
@@ -154,14 +149,97 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // ✅ Make the board sortable after groups exist
-  Sortable.create(board, {
-    animation: 150,
-    handle: '.srf-card, .white-card, .group-card',
-    ghostClass: 'dragging',
+  // === 🎨 COLOR PICKER (with emoji icon) + PNG DOWNLOAD ===
+  function addColorPickers() {
+    board.querySelectorAll(".srf-card").forEach(card => {
+      if (card.querySelector(".color-btn")) return;
+
+      // Create invisible color input
+      const colorInput = document.createElement("input");
+      colorInput.type = "color";
+      colorInput.className = "color-input";
+      colorInput.value = card.dataset.color || "#ffffff";
+      colorInput.style.display = "none";
+
+      // Create emoji button that triggers color input
+      const emojiBtn = document.createElement("button");
+      emojiBtn.className = "btn btn-sm btn-outline-secondary color-btn";
+      emojiBtn.innerHTML = "🎨";
+      emojiBtn.title = "Change card color";
+      emojiBtn.style.position = "absolute";
+      emojiBtn.style.top = "5px";
+      emojiBtn.style.right = "5px";
+      emojiBtn.style.padding = "2px 6px";
+      emojiBtn.style.fontSize = "14px";
+      emojiBtn.style.lineHeight = "1";
+      emojiBtn.style.borderRadius = "6px";
+
+      emojiBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        colorInput.click(); // open native color picker
+      });
+
+      colorInput.addEventListener("input", (e) => {
+        const color = e.target.value;
+        card.style.backgroundColor = color;
+        card.dataset.color = color;
+        saveCardColors();
+      });
+
+      card.style.position = "relative";
+      card.appendChild(emojiBtn);
+      card.appendChild(colorInput);
+    });
+  }
+
+  // 💾 Save colors
+  function saveCardColors() {
+    const colors = {};
+    board.querySelectorAll(".srf-card").forEach(card => {
+      colors[card.dataset.id || card.innerText.trim()] = card.dataset.color || "#ffffff";
+    });
+    localStorage.setItem("cardColors", JSON.stringify(colors));
+  }
+
+  // 🔁 Restore colors
+  function loadCardColors() {
+    const saved = JSON.parse(localStorage.getItem("cardColors") || "{}");
+    board.querySelectorAll(".srf-card").forEach(card => {
+      const key = card.dataset.id || card.innerText.trim();
+      if (saved[key]) {
+        card.style.backgroundColor = saved[key];
+        card.dataset.color = saved[key];
+      }
+    });
+  }
+
+  // 📸 Download as PNG
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "btn btn-success mt-3";
+  downloadBtn.innerHTML = "📸 Download Cards as PNG";
+  document.querySelector(".col-lg-8").appendChild(downloadBtn);
+
+  downloadBtn.addEventListener("click", async () => {
+    downloadBtn.disabled = true;
+    downloadBtn.innerText = "📸 Generating...";
+    try {
+      const canvas = await html2canvas(board, { scale: 2, backgroundColor: "#ffffff" });
+      const link = document.createElement("a");
+      link.download = `project_{{ project.id }}_srf_cards.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) {
+      alert("Error generating PNG: " + err.message);
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.innerText = "📸 Download Cards as PNG";
+    }
   });
+
+  // Initialize
+  addColorPickers();
+  loadCardColors();
 });
 </script>
-
 
 {% endblock %}
