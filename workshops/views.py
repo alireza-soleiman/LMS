@@ -9,6 +9,8 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.db.models import Q
+import re
+from collections import OrderedDict
 
 
 
@@ -229,15 +231,13 @@ def problem_tree_data(request, project_id):
 
     return JsonResponse(tree_data)
 
-
-# Phase 1: Indicator selection (Delphi)
 def indicator_selection_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
 
-    # ✅ Step 1: Clone indicators from MasterIndicator if this project has none yet
+    # Clone master indicators if project is empty
     if not project.indicators.exists():
         master_list = MasterIndicator.objects.all()
-        indicators_to_create = [
+        to_create = [
             Indicator(
                 project=project,
                 master_indicator=m,
@@ -246,13 +246,12 @@ def indicator_selection_view(request, project_id):
                 category=m.category,
                 criterion=m.criterion,
                 unit=m.unit,
-            )
-            for m in master_list
+            ) for m in master_list
         ]
-        Indicator.objects.bulk_create(indicators_to_create)
-        print(f"✅ Cloned {len(indicators_to_create)} indicators into project {project.id}")
+        if to_create:
+            Indicator.objects.bulk_create(to_create)
 
-    # ✅ Step 2: Handle “add custom indicator” form submission
+    # Handle add-custom form
     if request.method == "POST" and "add_indicator" in request.POST:
         form = IndicatorForm(request.POST)
         if form.is_valid():
@@ -264,41 +263,100 @@ def indicator_selection_view(request, project_id):
     else:
         form = IndicatorForm()
 
-    # ✅ Step 3: Prepare indicator hierarchy
-    indicators = project.indicators.all().order_by("category", "name")
+    # Get all indicators for this project
+    indicators_qs = project.indicators.all().order_by("category", "name")
 
-    # Detect main categories (A., B., C., …)
-    main_categories = sorted(
-        {
-            cat
-            for cat in indicators.values_list("category", flat=True)
-            if cat and not cat.split()[0][0].isdigit() and "." in cat.split()[0] and cat.split()[0].count(".") == 1
-        }
-        | {
-            cat
-            for cat in indicators.values_list("category", flat=True)
-            if cat and cat[0].isalpha() and cat.startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) and "." in cat
-        }
-    )
+    # Collect unique category strings in order
+    categories = []
+    for c in indicators_qs.values_list("category", flat=True).distinct():
+        if c and c not in categories:
+            categories.append(c)
 
-    # Detect subcategories (A1., A2., …)
-    sub_categories = sorted(
-        {
-            cat
-            for cat in indicators.values_list("category", flat=True)
-            if cat and any(ch.isdigit() for ch in cat.split()[0]) and cat.split()[0].count(".") == 1
-        }
-    )
+    # Helper to get the prefix token (first token, e.g., 'A.', 'A1.', etc.)
+    def token_of(cat):
+        if not cat:
+            return ""
+        token = str(cat).strip().split()[0]
+        return token
 
-    # All indicators (A1.1, A2.3, …)
-    indicator_items = indicators.exclude(name__exact="").order_by("category", "name")
+    # Patterns
+    main_re = re.compile(r'^[A-Z]\.$')          # e.g. "A."
+    sub_re = re.compile(r'^[A-Z]\d+\.$')        # e.g. "A1."
+    # indicator names start like "A1.1 - ..." so we'll check name prefix
+
+    # Build ordered main -> sub -> indicators structure
+    hierarchy = OrderedDict()
+
+    # Build lists of main and sub category tokens and keep mapping to full category string
+    main_map = OrderedDict()   # token -> full string
+    sub_map = OrderedDict()    # token -> full string (last occurrence)
+
+    for cat in categories:
+        t = token_of(cat)
+        if main_re.match(t):
+            main_map[t] = cat
+        elif sub_re.match(t):
+            sub_map[t] = cat
+        else:
+            # If a category doesn't match, try to detect by first char (fall back)
+            # e.g. 'A. Use of ...' or 'A1. Use...'
+            if re.match(r'^[A-Z]', t):
+                # if single letter token with trailing dot missing, add dot
+                if len(t) == 1:
+                    main_map[f"{t}."] = cat
+                else:
+                    sub_map[t if t.endswith('.') else t + '.'] = cat
+
+    # Initialize hierarchy with main categories in order of appearance
+    for main_token, main_full in main_map.items():
+        hierarchy[main_token] = {
+            "full": main_full,
+            "subs": OrderedDict()
+        }
+
+    # Place subcategories under their parent main category
+    for sub_token, sub_full in sub_map.items():
+        # parent letter is the first letter of sub_token
+        parent_letter = sub_token[0]
+        parent_token = f"{parent_letter}."
+        if parent_token not in hierarchy:
+            # Create parent if missing (defensive)
+            hierarchy[parent_token] = {"full": parent_token, "subs": OrderedDict()}
+        hierarchy[parent_token]["subs"][sub_token] = {
+            "full": sub_full,
+            "indicators": []
+        }
+
+    # Now assign indicator rows to the matching subcategory by checking the prefix of indicator.name
+    for ind in indicators_qs:
+        name = (ind.name or "").strip()
+        # Attempt to find a subtoken that matches the start of the name (e.g., 'A1.' matches 'A1.1 - ...')
+        matched = False
+        for main_token, main_dict in hierarchy.items():
+            for sub_token, sub_dict in main_dict["subs"].items():
+                # ensure sub_token ends with '.' for matching
+                st = sub_token if sub_token.endswith('.') else sub_token + '.'
+                if name.startswith(st):
+                    sub_dict["indicators"].append(ind)
+                    matched = True
+                    break
+            if matched:
+                break
+        if not matched:
+            # If no subcategory matched, try to attach to a "Uncategorized" bucket under top-level
+            parent = next(iter(hierarchy.values())) if hierarchy else None
+            if parent:
+                # create a fallback subcategory label
+                fallback_key = "uncategorized"
+                if fallback_key not in parent["subs"]:
+                    parent["subs"][fallback_key] = {"full": "Uncategorized", "indicators": []}
+                parent["subs"][fallback_key]["indicators"].append(ind)
 
     context = {
         "project": project,
         "form": form,
-        "main_categories": main_categories,
-        "sub_categories": sub_categories,
-        "indicator_items": indicator_items,
+        "hierarchy": hierarchy,   # OrderedDict of mains -> subs -> indicators
+        "indicator_count": indicators_qs.count(),
     }
 
     return render(request, "workshops/indicator_selection.html", context)
