@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}SWOT Analysis — {{ project.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <h2 class="mb-3 text-center">🧭 Workshop 4 — SWOT Analysis</h2>
+  <p class="text-center text-muted">
+    Identify your project’s <strong>Strengths</strong>, <strong>Weaknesses</strong>, <strong>Opportunities</strong>, and <strong>Threats</strong>.
+  </p>
+
+  <!-- ✅ SWOT Grid -->
+  <div class="row g-3 mt-4">
+    <div class="col-md-6">
+      <div class="swot-box strength">
+        <h5>💪 Strengths</h5>
+        <div class="swot-list" id="strengthList">
+          {% for item in swot.S %}
+          <div class="swot-card" data-id="{{ item.id }}">
+            <div class="swot-content">
+              <h6>{{ item.title }}</h6>
+              <p>{{ item.description }}</p>
+            </div>
+            <div class="swot-actions">
+              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
+              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small">No strengths yet.</p>
+          {% endfor %}
+        </div>
+        <button class="btn btn-success btn-sm mt-2 add-btn" data-category="S">➕ Add Strength</button>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="swot-box weakness">
+        <h5>⚠️ Weaknesses</h5>
+        <div class="swot-list" id="weaknessList">
+          {% for item in swot.W %}
+          <div class="swot-card" data-id="{{ item.id }}">
+            <div class="swot-content">
+              <h6>{{ item.title }}</h6>
+              <p>{{ item.description }}</p>
+            </div>
+            <div class="swot-actions">
+              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
+              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small">No weaknesses yet.</p>
+          {% endfor %}
+        </div>
+        <button class="btn btn-warning btn-sm mt-2 add-btn" data-category="W">➕ Add Weakness</button>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="swot-box opportunity">
+        <h5>🌱 Opportunities</h5>
+        <div class="swot-list" id="opportunityList">
+          {% for item in swot.O %}
+          <div class="swot-card" data-id="{{ item.id }}">
+            <div class="swot-content">
+              <h6>{{ item.title }}</h6>
+              <p>{{ item.description }}</p>
+            </div>
+            <div class="swot-actions">
+              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
+              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small">No opportunities yet.</p>
+          {% endfor %}
+        </div>
+        <button class="btn btn-info btn-sm mt-2 add-btn" data-category="O">➕ Add Opportunity</button>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="swot-box threat">
+        <h5>🔥 Threats</h5>
+        <div class="swot-list" id="threatList">
+          {% for item in swot.T %}
+          <div class="swot-card" data-id="{{ item.id }}">
+            <div class="swot-content">
+              <h6>{{ item.title }}</h6>
+              <p>{{ item.description }}</p>
+            </div>
+            <div class="swot-actions">
+              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
+              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+            </div>
+          </div>
+          {% empty %}
+          <p class="text-muted small">No threats yet.</p>
+          {% endfor %}
+        </div>
+        <button class="btn btn-danger btn-sm mt-2 add-btn" data-category="T">➕ Add Threat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🧩 Modal -->
+<div class="modal fade" id="swotModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit SWOT Entry</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editId">
+        <input type="hidden" id="editCategory">
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input type="text" class="form-control" id="editTitle">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" id="editDescription" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="saveEdit">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.swot-box {
+  border-radius: 12px;
+  padding: 15px;
+  min-height: 280px;
+  background: #fff;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+  transition: all 0.3s;
+}
+.swot-box:hover {
+  transform: translateY(-2px);
+}
+.swot-box h5 { font-weight: 600; }
+.swot-box.strength { border-top: 5px solid #28a745; }
+.swot-box.weakness { border-top: 5px solid #ffc107; }
+.swot-box.opportunity { border-top: 5px solid #17a2b8; }
+.swot-box.threat { border-top: 5px solid #dc3545; }
+
+.swot-card {
+  background: #f8f9fa;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  position: relative;
+  transition: 0.2s;
+}
+.swot-card:hover {
+  background: #eef1f5;
+}
+.swot-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const modal = new bootstrap.Modal(document.getElementById("swotModal"));
+  const saveBtn = document.getElementById("saveEdit");
+
+  document.querySelectorAll(".add-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById("editId").value = "";
+      document.getElementById("editCategory").value = btn.dataset.category;
+      document.getElementById("editTitle").value = "";
+      document.getElementById("editDescription").value = "";
+      modal.show();
+    });
+  });
+
+  document.querySelectorAll(".edit-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const card = e.target.closest(".swot-card");
+      document.getElementById("editId").value = card.dataset.id;
+      document.getElementById("editTitle").value = card.querySelector("h6").innerText;
+      document.getElementById("editDescription").value = card.querySelector("p").innerText;
+      modal.show();
+    });
+  });
+
+  document.querySelectorAll(".delete-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const id = e.target.closest(".swot-card").dataset.id;
+      if (confirm("Delete this entry?")) saveChange("delete", { id });
+    });
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const id = document.getElementById("editId").value;
+    const category = document.getElementById("editCategory").value;
+    const title = document.getElementById("editTitle").value;
+    const description = document.getElementById("editDescription").value;
+    const action = id ? "edit" : "add";
+    saveChange(action, { id, category, title, description });
+    modal.hide();
+  });
+
+  function saveChange(action, payload) {
+    fetch("{% url 'save_swot_entry' project.id %}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
+      body: JSON.stringify({ action, ...payload })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status) location.reload();
+      else alert("Error saving change");
+    });
+  }
+});
+</script>
+{% endblock %}
