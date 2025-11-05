@@ -1,5 +1,6 @@
 
-from .models import Project, Problem, Stakeholder, Objective, Indicator, MasterIndicator
+from .models import Project, Problem, Stakeholder, Objective, Indicator, MasterIndicator , SWOTItem
+
 from .forms import StakeholderForm , ProblemForm , IndicatorForm
 import csv
 import json
@@ -455,48 +456,54 @@ def save_indicator_selections(request, project_id):
     return JsonResponse({"status": "error", "message": "Invalid method"}, status=400)
 
 
+# ✅ SWOT Analysis View
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
 
 def swot_analysis_view(request, project_id):
     project = get_object_or_404(Project, id=project_id)
-    entries = project.swot_entries.all()
+    swot_items = project.swot_items.all() if hasattr(project, 'swot_items') else []
 
-    swot = {
-        'S': entries.filter(category='S'),
-        'W': entries.filter(category='W'),
-        'O': entries.filter(category='O'),
-        'T': entries.filter(category='T'),
+    # Organize items by category
+    categories = {'S': [], 'W': [], 'O': [], 'T': []}
+    for item in swot_items:
+        categories[item.category].append(item)
+
+    context = {
+        'project': project,
+        'swot': categories,
     }
+    return render(request, 'workshops/swot_analysis.html', context)
 
-    return render(request, 'workshops/swot_analysis.html', {'project': project, 'swot': swot})
 
-
-@require_POST
 @csrf_exempt
 def save_swot_entry(request, project_id):
-    """Handles AJAX create/edit/delete for SWOT items."""
+    """AJAX add/edit/delete SWOT items"""
     project = get_object_or_404(Project, id=project_id)
     data = json.loads(request.body)
+    action = data.get("action")
 
-    action = data.get('action')
-    if action == 'add':
-        entry = SWOTEntry.objects.create(
+    from .models import SWOTItem  # make sure model exists
+
+    if action == "add":
+        item = SWOTItem.objects.create(
             project=project,
-            category=data.get('category'),
-            title=data.get('title', ''),
-            description=data.get('description', '')
+            category=data["category"],
+            title=data["title"],
+            description=data["description"]
         )
-        return JsonResponse({'status': 'created', 'id': entry.id})
+        return JsonResponse({"status": "ok", "id": item.id})
 
-    elif action == 'edit':
-        entry = SWOTEntry.objects.filter(id=data.get('id'), project=project).first()
-        if entry:
-            entry.title = data.get('title', entry.title)
-            entry.description = data.get('description', entry.description)
-            entry.save()
-            return JsonResponse({'status': 'updated'})
+    elif action == "edit":
+        item = SWOTItem.objects.get(id=data["id"], project=project)
+        item.title = data["title"]
+        item.description = data["description"]
+        item.save()
+        return JsonResponse({"status": "ok"})
 
-    elif action == 'delete':
-        SWOTEntry.objects.filter(id=data.get('id'), project=project).delete()
-        return JsonResponse({'status': 'deleted'})
+    elif action == "delete":
+        SWOTItem.objects.filter(id=data["id"], project=project).delete()
+        return JsonResponse({"status": "ok"})
 
-    return JsonResponse({'status': 'error', 'message': 'Invalid action'}, status=400)
+    return JsonResponse({"status": "error"})
