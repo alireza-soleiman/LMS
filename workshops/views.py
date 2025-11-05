@@ -442,10 +442,6 @@ def download_indicators_csv(request, project_id):
     return response
 
 
-from django.views.decorators.csrf import csrf_exempt
-import json
-from django.http import JsonResponse
-
 @csrf_exempt
 def save_indicator_selections(request, project_id):
     if request.method == "POST":
@@ -457,3 +453,50 @@ def save_indicator_selections(request, project_id):
         Indicator.objects.filter(project_id=project_id, id__in=selected_ids).update(accepted=True)
         return JsonResponse({"status": "success", "count": len(selected_ids)})
     return JsonResponse({"status": "error", "message": "Invalid method"}, status=400)
+
+
+
+def swot_analysis_view(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    entries = project.swot_entries.all()
+
+    swot = {
+        'S': entries.filter(category='S'),
+        'W': entries.filter(category='W'),
+        'O': entries.filter(category='O'),
+        'T': entries.filter(category='T'),
+    }
+
+    return render(request, 'workshops/swot_analysis.html', {'project': project, 'swot': swot})
+
+
+@require_POST
+@csrf_exempt
+def save_swot_entry(request, project_id):
+    """Handles AJAX create/edit/delete for SWOT items."""
+    project = get_object_or_404(Project, id=project_id)
+    data = json.loads(request.body)
+
+    action = data.get('action')
+    if action == 'add':
+        entry = SWOTEntry.objects.create(
+            project=project,
+            category=data.get('category'),
+            title=data.get('title', ''),
+            description=data.get('description', '')
+        )
+        return JsonResponse({'status': 'created', 'id': entry.id})
+
+    elif action == 'edit':
+        entry = SWOTEntry.objects.filter(id=data.get('id'), project=project).first()
+        if entry:
+            entry.title = data.get('title', entry.title)
+            entry.description = data.get('description', entry.description)
+            entry.save()
+            return JsonResponse({'status': 'updated'})
+
+    elif action == 'delete':
+        SWOTEntry.objects.filter(id=data.get('id'), project=project).delete()
+        return JsonResponse({'status': 'deleted'})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid action'}, status=400)
