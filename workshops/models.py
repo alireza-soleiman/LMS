@@ -135,3 +135,21 @@ class IndicatorRanking(models.Model):
 
     class Meta:
         ordering = ['position']
+
+class SWOTEntry(models.Model):
+    CATEGORY_CHOICES = [
+        ('S', 'Strength'),
+        ('W', 'Weakness'),
+        ('O', 'Opportunity'),
+        ('T', 'Threat'),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="swot_entries")
+    category = models.CharField(max_length=1, choices=CATEGORY_CHOICES)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_category_display()} – {self.title}"
+
