@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import ranking_page_view
+from .views import ranking_page_view, save_swot_entry, swot_analysis_view
 
 urlpatterns = [
     path('', views.workshop_list, name='workshop_list'),
@@ -24,4 +24,7 @@ urlpatterns = [
     path('project/<int:project_id>/ranking/', views.ranking_page_view, name='indicator_ranking'),
     path('project/<int:project_id>/ranking/save/', views.indicator_ranking_view, name='indicator_ranking_view'),
     path('project/<int:project_id>/ranking/download/', views.download_indicators_csv, name='download_indicators_csv'),
+    path('project/<int:project_id>/swot/', swot_analysis_view, name='swot_analysis'),
+    path('project/<int:project_id>/swot/save/', save_swot_entry, name='save_swot_entry'),
+
 ]
