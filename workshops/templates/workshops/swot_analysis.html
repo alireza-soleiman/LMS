@@ -169,6 +169,49 @@
   display: flex;
   gap: 4px;
 }
+/* ✨ Smooth floating quadrant animations */
+.swot-quadrant {
+  transition: all 0.25s ease-in-out;
+  transform: translateY(0);
+}
+.swot-quadrant:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* 🪄 Animated card hover and drag state */
+.swot-card {
+  transition: all 0.25s ease;
+  cursor: grab;
+  border-radius: 10px;
+  border: 1px solid #dee2e6;
+  background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.swot-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+/* 🎨 Visual feedback when dragging cards */
+.swot-card.sortable-chosen {
+  background: #e9f7ef;
+  border-color: #28a745;
+  box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+}
+Sortable.create(el, {
+  group: "swot",
+  animation: 200,
+  ghostClass: "sortable-ghost",
+  chosenClass: "sortable-chosen",
+  dragClass: "sortable-drag"
+});
+/* 🎯 Drop target glow */
+.quad-body.sortable-ghost {
+  border: 2px dashed #007bff;
+  background-color: #f0f8ff;
+}
+
 </style>
 
 <script>
