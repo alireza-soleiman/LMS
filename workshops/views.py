@@ -506,4 +506,10 @@ def save_swot_entry(request, project_id):
         SWOTItem.objects.filter(id=data["id"], project=project).delete()
         return JsonResponse({"status": "ok"})
 
+    elif action == "reorder":
+        order = data.get("order", [])
+        for position, item_id in enumerate(order, start=1):
+            SWOTItem.objects.filter(id=item_id, project=project).update(order=position)
+        return JsonResponse({"status": "ok"})
+
     return JsonResponse({"status": "error"})
