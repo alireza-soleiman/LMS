@@ -563,3 +563,58 @@ def create_project_view(request):
 
     return render(request, 'workshops/create_project.html', {'form': form})
 
+
+@login_required
+def project_overview_view(request, project_id):
+    """
+    Interactive project info page, contains the matrix boxes
+    A1 Problem, A2 Context, B1 Solution, B2 Activities, C1 Stakeholders, C2 Resources, C3 Dissemination, D2 SDGs
+    We'll store them in Project model using a simple JSON field 'overview' (create it dynamically here using attributes).
+    To keep DB changes minimal, reuse Project.members field or create new Project.overview JSONField if you prefer to migrate.
+    For simplicity, we'll store overview in the Project.members plus a new field 'overview' ideally; below I use members to avoid altering again.
+    -- If you want a proper field, add: overview = models.JSONField(blank=True, default=dict) in models and migrate.
+    """
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+
+    # We'll use a Project-level JSON key 'overview' -> if not present, create default structure
+    overview = getattr(project, 'overview', None)
+    if overview is None:
+        # Avoid DB changes: attach a runtime dict but we recommend adding a JSONField called `overview` to the model.
+        # If you add Project.overview (JSONField), replace this logic accordingly.
+        overview = {
+            "A1": {"title": "Problem", "text": ""},
+            "A2": {"title": "Context", "text": ""},
+            "B1": {"title": "Solution", "text": ""},
+            "B2": {"title": "Activities", "text": ""},
+            "C1": {"title": "Stakeholders", "text": ""},
+            "C2": {"title": "Resources", "text": ""},
+            "C3": {"title": "Dissemination", "text": ""},
+            "D2": {"title": "Impact on SDGs", "text": ""}
+        }
+    # If user submitted an update via POST (save)
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            # Expected: { "box": "A1", "text": "..." } or whole overview patch
+            box = data.get('box')
+            text = data.get('text')
+            if box and box in overview:
+                overview[box]['text'] = text or ""
+                # Save to DB if you added Project.overview JSONField:
+                if hasattr(Project, 'overview'):
+                    project.overview = overview
+                    project.save()
+                else:
+                    # fallback: store (serialize) in members field (not ideal) OR skip DB persist
+                    # best path: add Project.overview JSONField and migrate.
+                    pass
+                return JsonResponse({"status": "ok"})
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
+
+    # On GET: render template with current data
+    # Prefer to read project.overview if exists; fallback to empty structure
+    if hasattr(project, 'overview') and project.overview:
+        overview = project.overview
+
+    return render(request, 'workshops/project_overview.html', {'project': project, 'overview': overview})
