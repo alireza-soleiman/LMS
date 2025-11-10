@@ -210,17 +210,16 @@ def problem_tree_data(request, project_id):
 # -------------------------
 # Workshop List / Projects
 # -------------------------
+from django.contrib.auth.decorators import login_required
+
 @login_required
 def workshop_list(request):
-    """
-    Shows projects. For staff show all projects, for normal users show only owned projects.
-    """
     if request.user.is_staff:
-        projects = Project.objects.all().order_by("title")
+        projects = Project.objects.all().order_by('title')  # admin sees all
     else:
-        projects = Project.objects.filter(owner=request.user).order_by("title")
+        projects = Project.objects.filter(owner=request.user).order_by('title')
 
-    return render(request, "workshops/workshop_list.html", {"projects": projects})
+    return render(request, 'workshops/workshop_list.html', {'projects': projects})
 
 
 # -------------------------
@@ -494,3 +493,13 @@ def save_swot_entry(request, project_id):
 
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@login_required
+def dashboard_view(request):
+    """Show all projects belonging to the logged-in user."""
+    projects = Project.objects.filter(owner=request.user).order_by('title')
+
+    return render(request, 'workshops/dashboard.html', {
+        'projects': projects,
+    })
