@@ -26,5 +26,7 @@ urlpatterns = [
     path('project/<int:project_id>/ranking/download/', views.download_indicators_csv, name='download_indicators_csv'),
     path('project/<int:project_id>/swot/', swot_analysis_view, name='swot_analysis'),
     path('project/<int:project_id>/swot/save/', save_swot_entry, name='save_swot_entry'),
+    path('project/create/', views.create_project_view, name='create_project'),
+    path('project/<int:project_id>/overview/', views.project_overview_view, name='project_overview'),
 
 ]
