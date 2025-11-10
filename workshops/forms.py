@@ -70,3 +70,12 @@ class IndicatorForm(forms.ModelForm):
         if not name:
             raise ValidationError("Indicator name cannot be empty.")
         return name
+class ProjectCreateForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ['title', 'description', 'group_name']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Project title'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'group_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Group name'}),
+        }
