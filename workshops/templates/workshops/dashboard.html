@@ -2,36 +2,50 @@
 {% block title %}My Dashboard{% endblock %}
 {% block content %}
 <div class="container py-5">
-  <h2 class="mb-4">🎓 Welcome, {{ user.username }}!</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>🎓 My Projects</h2>
+    <a href="{% url 'create_project' %}" class="btn btn-success">➕ New Project</a>
+  </div>
 
-  {% if projects %}
+  {% if project_cards %}
   <div class="row g-4">
-    {% for project in projects %}
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 rounded-3 h-100">
+    {% for card in project_cards %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm">
         <div class="card-body">
-          <h5 class="card-title">{{ project.title }}</h5>
-          <p class="text-muted small">{{ project.description|default:"No description yet." }}</p>
+          <h5 class="card-title">{{ card.project.title }}</h5>
+          <p class="text-muted small mb-2">{{ card.project.description|default:"No description" }}</p>
 
-          <hr>
-          <ul class="list-unstyled small mb-3">
-            <li>📋 <a href="{% url 'stakeholder_list' project.id %}">Workshop 1: Stakeholder Analysis</a></li>
-            <li>🌳 <a href="{% url 'problem_tree' project.id %}">Workshop 2: Problem Tree Analysis</a></li>
-            <li>📈 <a href="{% url 'indicator_selection' project.id %}">Workshop 3: Indicator Selection</a></li>
-            <li>🎴 <a href="{% url 'indicator_ranking' project.id %}">Workshop 3.2: SRF Playing Cards</a></li>
-            <li>🧭 <a href="{% url 'swot_analysis' project.id %}">Workshop 4: SWOT Analysis</a></li>
+          <div class="mb-2">
+            <div class="d-flex justify-content-between small">
+              <div>Progress</div>
+              <div>{{ card.completed }} / {{ card.total }}</div>
+            </div>
+            <div class="progress" style="height: 10px;">
+              <div class="progress-bar" role="progressbar" style="width: {{ card.percent }}%;" aria-valuenow="{{ card.percent }}" aria-valuemin="0" aria-valuemax="100">
+                {{ card.percent }}%
+              </div>
+            </div>
+          </div>
+
+          <ul class="list-unstyled small mt-3 mb-3">
+            <li>📋 <a href="{% url 'stakeholder_list' card.project.id %}">Stakeholder Analysis</a></li>
+            <li>🌳 <a href="{% url 'problem_tree' card.project.id %}">Problem Tree</a></li>
+            <li>📈 <a href="{% url 'indicator_selection' card.project.id %}">Indicator Selection</a></li>
+            <li>🧭 <a href="{% url 'swot_analysis' card.project.id %}">SWOT</a></li>
           </ul>
 
-          <a href="{% url 'stakeholder_list' project.id %}" class="btn btn-primary w-100">Open Project</a>
+          <div class="d-grid gap-2">
+            <a href="{% url 'project_overview' card.project.id %}" class="btn btn-outline-primary btn-sm">Project Info</a>
+            <a href="{% url 'stakeholder_list' card.project.id %}" class="btn btn-primary btn-sm">Open Project</a>
+          </div>
         </div>
       </div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="alert alert-info text-center">
-    You don’t have any projects yet. Ask your instructor to assign one.
-  </div>
+  <div class="alert alert-info">You have no projects yet. Click “New Project” to create one.</div>
   {% endif %}
 </div>
 {% endblock %}
