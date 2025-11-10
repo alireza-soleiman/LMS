@@ -10,6 +10,13 @@
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+      {% if user.is_authenticated %}
+  <span class="me-2 text-muted">👋 {{ user.username }}</span>
+  <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm">Logout</a>
+{% else %}
+  <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm">Login</a>
+{% endif %}
+
     <div class="container">
       <a class="navbar-brand" href="/workshops/">Workshop Dashboard</a>
     </div>
