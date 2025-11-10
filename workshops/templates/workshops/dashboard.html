@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <h2 class="mb-4">🎓 Welcome, {{ user.username }}!</h2>
+
+  {% if projects %}
+  <div class="row g-4">
+    {% for project in projects %}
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 rounded-3 h-100">
+        <div class="card-body">
+          <h5 class="card-title">{{ project.title }}</h5>
+          <p class="text-muted small">{{ project.description|default:"No description yet." }}</p>
+
+          <hr>
+          <ul class="list-unstyled small mb-3">
+            <li>📋 <a href="{% url 'stakeholder_list' project.id %}">Workshop 1: Stakeholder Analysis</a></li>
+            <li>🌳 <a href="{% url 'problem_tree' project.id %}">Workshop 2: Problem Tree Analysis</a></li>
+            <li>📈 <a href="{% url 'indicator_selection' project.id %}">Workshop 3: Indicator Selection</a></li>
+            <li>🎴 <a href="{% url 'indicator_ranking' project.id %}">Workshop 3.2: SRF Playing Cards</a></li>
+            <li>🧭 <a href="{% url 'swot_analysis' project.id %}">Workshop 4: SWOT Analysis</a></li>
+          </ul>
+
+          <a href="{% url 'stakeholder_list' project.id %}" class="btn btn-primary w-100">Open Project</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-info text-center">
+    You don’t have any projects yet. Ask your instructor to assign one.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
