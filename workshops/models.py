@@ -4,17 +4,20 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Project(models.Model):
-    title = models.CharField(max_length=200)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
+    title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
-    group_name = models.CharField(max_length=200, blank=True, default='')
-    # JSONField requires Django >= 3.1 (you have 5.2): store list of dicts: [{"first":"", "last":"", "id":"", "email":""}, ...]
-    members = models.JSONField(blank=True, null=True, default=list)
+
+    # 🧠 Store Workshop 0 Overview data (A1–D2 boxes)
+    overview = models.JSONField(default=dict, blank=True)
+
+    # 👥 Team information
+    group_name = models.CharField(max_length=255, blank=True, null=True)
+    members = models.JSONField(default=list, blank=True)  # list of {name, surname, student_number, email}
 
     def __str__(self):
         return f"{self.title} ({self.owner.username})"
-
 
 class Stakeholder(models.Model):
     LEVEL_CHOICES = [
