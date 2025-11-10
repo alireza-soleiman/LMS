@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Project Overview — {{ project.title }}{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3>{{ project.title }} — Project Info</h3>
+  <p class="text-muted">Fill the boxes below. Your changes auto-save when you click Save.</p>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card p-3 mb-3">
+        <h5 class="text-danger">A1 — Problem</h5>
+        <textarea id="boxA1" class="form-control" rows="6">{{ overview.A1.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="A1">Save</button></div>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h5 class="text-danger">A2 — Context</h5>
+        <textarea id="boxA2" class="form-control" rows="5">{{ overview.A2.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="A2">Save</button></div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card p-3 mb-3">
+        <h5 class="text-primary">B1 — Solution</h5>
+        <textarea id="boxB1" class="form-control" rows="6">{{ overview.B1.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="B1">Save</button></div>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h5 class="text-primary">B2 — Activities</h5>
+        <textarea id="boxB2" class="form-control" rows="4">{{ overview.B2.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="B2">Save</button></div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 mb-3">
+        <h5 class="text-purple">C1 — Stakeholders</h5>
+        <textarea id="boxC1" class="form-control" rows="5">{{ overview.C1.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C1">Save</button></div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 mb-3">
+        <h5 class="text-purple">C2 — Resources</h5>
+        <textarea id="boxC2" class="form-control" rows="5">{{ overview.C2.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C2">Save</button></div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 mb-3">
+        <h5 class="text-purple">C3 — Dissemination</h5>
+        <textarea id="boxC3" class="form-control" rows="5">{{ overview.C3.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C3">Save</button></div>
+      </div>
+    </div>
+
+    <div class="col-md-12">
+      <div class="card p-3 mb-3">
+        <h5 class="text-warning">D2 — Impact on SDGs</h5>
+        <textarea id="boxD2" class="form-control" rows="3">{{ overview.D2.text }}</textarea>
+        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="D2">Save</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const saveButtons = document.querySelectorAll(".save-box");
+  saveButtons.forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const box = btn.dataset.box;
+      const text = document.getElementById("box" + box).value;
+      btn.disabled = true;
+      btn.innerText = "Saving...";
+      try {
+        const res = await fetch("{% url 'project_overview' project.id %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          body: JSON.stringify({ box: box, text: text })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          btn.innerText = "Saved";
+          setTimeout(()=>{ btn.innerText = "Save"; btn.disabled = false; }, 900);
+        } else {
+          alert("Error saving: " + (data.message || "unknown"));
+          btn.disabled = false;
+          btn.innerText = "Save";
+        }
+      } catch (err) {
+        alert("Network error: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Save";
+      }
+    });
+  });
+});
+</script>
+{% endblock %}
