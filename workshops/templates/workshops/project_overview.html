@@ -2,8 +2,12 @@
 {% block title %}Project Overview — {{ project.title }}{% endblock %}
 {% block content %}
 <div class="container py-4">
-  <h3>{{ project.title }} — Project Info</h3>
-  <p class="text-muted">Fill the boxes below. Your changes auto-save when you click Save.</p>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">{{ project.title }} — Project Info</h3>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+  </div>
+  <p class="text-muted">Fill in each section below. You can save individually or use “Save & Continue” at the bottom.</p>
+
 
   <div class="row g-3">
     <div class="col-md-6">
@@ -66,41 +70,52 @@
       </div>
     </div>
   </div>
+<div class="text-end mt-4">
+    <button id="saveAllBtn" class="btn btn-success">
+      💾 Save & Continue to Dashboard
+    </button>
+  </div>
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const saveButtons = document.querySelectorAll(".save-box");
+
+  async function saveBox(box, text) {
+    const res = await fetch("{% url 'project_overview' project.id %}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
+      body: JSON.stringify({ box, text })
+    });
+    return res.json();
+  }
+
+  // individual save buttons
   saveButtons.forEach(btn => {
-    btn.addEventListener("click", async (e) => {
+    btn.addEventListener("click", async () => {
       const box = btn.dataset.box;
       const text = document.getElementById("box" + box).value;
       btn.disabled = true;
       btn.innerText = "Saving...";
-      try {
-        const res = await fetch("{% url 'project_overview' project.id %}", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": "{{ csrf_token }}",
-          },
-          body: JSON.stringify({ box: box, text: text })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          btn.innerText = "Saved";
-          setTimeout(()=>{ btn.innerText = "Save"; btn.disabled = false; }, 900);
-        } else {
-          alert("Error saving: " + (data.message || "unknown"));
-          btn.disabled = false;
-          btn.innerText = "Save";
-        }
-      } catch (err) {
-        alert("Network error: " + err.message);
-        btn.disabled = false;
-        btn.innerText = "Save";
+      const data = await saveBox(box, text);
+      if (data.status === "ok") {
+        btn.innerText = "Saved";
+        setTimeout(()=>{ btn.innerText="Save"; btn.disabled=false; }, 900);
+      } else {
+        alert("Error: "+(data.message||"unknown"));
+        btn.disabled=false; btn.innerText="Save";
       }
     });
+  });
+
+  // 🔸 Save all + go back
+  document.getElementById("saveAllBtn").addEventListener("click", async () => {
+    const allBoxes = ["A1","A2","B1","B2","C1","C2","C3","D2"];
+    for (const b of allBoxes) {
+      const text = document.getElementById("box"+b).value;
+      await saveBox(b, text);
+    }
+    window.location.href = "{% url 'dashboard' %}";
   });
 });
 </script>
