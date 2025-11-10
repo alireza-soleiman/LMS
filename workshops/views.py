@@ -529,3 +529,37 @@ def dashboard_view(request):
         })
 
     return render(request, 'workshops/dashboard.html', {'project_cards': project_cards})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_project_view(request):
+    """
+    Allow students to create exactly one project.
+    If they already have one, redirect to dashboard or project overview.
+    """
+    # If user already has a project (non-staff), prevent creating another
+    if not request.user.is_staff:
+        if Project.objects.filter(owner=request.user).exists():
+            # redirect to dashboard
+            return redirect('dashboard')
+
+    if request.method == "POST":
+        form = ProjectCreateForm(request.POST)
+        members_json = request.POST.get('members_json', '[]')
+        try:
+            members = json.loads(members_json)
+        except Exception:
+            members = []
+
+        if form.is_valid():
+            project = form.save(commit=False)
+            project.owner = request.user
+            project.members = members
+            project.save()
+            return redirect('project_overview', project_id=project.id)
+    else:
+        form = ProjectCreateForm()
+
+    return render(request, 'workshops/create_project.html', {'form': form})
+
