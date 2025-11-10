@@ -8,6 +8,9 @@ class Project(models.Model):
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
+    group_name = models.CharField(max_length=200, blank=True, default='')
+    # JSONField requires Django >= 3.1 (you have 5.2): store list of dicts: [{"first":"", "last":"", "id":"", "email":""}, ...]
+    members = models.JSONField(blank=True, null=True, default=list)
 
     def __str__(self):
         return f"{self.title} ({self.owner.username})"
