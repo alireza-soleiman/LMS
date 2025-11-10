@@ -3,15 +3,15 @@ from collections import OrderedDict
 import csv
 import json
 import re
-
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST , require_http_methods
 
-from .forms import StakeholderForm, ProblemForm, IndicatorForm
+from .forms import StakeholderForm, ProblemForm, IndicatorForm , ProjectCreateForm
 from .models import (
     Project,
     Problem,
@@ -497,9 +497,35 @@ def save_swot_entry(request, project_id):
 
 @login_required
 def dashboard_view(request):
-    """Show all projects belonging to the logged-in user."""
-    projects = Project.objects.filter(owner=request.user).order_by('title')
+    """
+    Student landing page after login.
+    Shows one-card per project owned by user (staff sees all).
+    Also shows progress heuristic for each project.
+    """
+    if request.user.is_staff:
+        projects = Project.objects.all().order_by('title')
+    else:
+        projects = Project.objects.filter(owner=request.user).order_by('title')
 
-    return render(request, 'workshops/dashboard.html', {
-        'projects': projects,
-    })
+    # compute a simple progress score per project (0-100)
+    project_cards = []
+    for p in projects:
+        # simple heuristics: flags for each workshop presence:
+        ws1 = p.stakeholders.exists() if hasattr(p, 'stakeholders') else False
+        ws2 = p.problems.exists() if hasattr(p, 'problems') else False
+        ws3 = p.indicators.filter(accepted=True).exists() if hasattr(p, 'indicators') else False
+        ws4 = p.swot_items.exists() if hasattr(p, 'swot_items') else False
+
+        completed = sum([1 if ws1 else 0, 1 if ws2 else 0, 1 if ws3 else 0, 1 if ws4 else 0])
+        total = 4
+        percent = int((completed / total) * 100)
+
+        project_cards.append({
+            'project': p,
+            'completed': completed,
+            'total': total,
+            'percent': percent,
+            'ws_flags': {'ws1': ws1, 'ws2': ws2, 'ws3': ws3, 'ws4': ws4},
+        })
+
+    return render(request, 'workshops/dashboard.html', {'project_cards': project_cards})
