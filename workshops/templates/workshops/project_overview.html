@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Project Overview — {{ project.title }}{% endblock %}
 {% block content %}
-<div class="container py-4">
+<div class="container py-4" id="overviewContainer">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0">{{ project.title }} — Project Info</h3>
     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
   </div>
-  <p class="text-muted">Fill in each section below. You can save individually or use “Save & Continue” at the bottom.</p>
+  <p class="text-muted">
+    Fill in each section below. Text auto-saves every few seconds.
+    You can also use “Save & Continue” or “Download as PDF”.
+  </p>
 
-
+  <!-- 🔸 A/B Section -->
   <div class="row g-3">
     <div class="col-md-6">
       <div class="card p-3 mb-3">
         <h5 class="text-danger">A1 — Problem</h5>
         <textarea id="boxA1" class="form-control" rows="6">{{ overview.A1.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="A1">Save</button></div>
       </div>
-
       <div class="card p-3 mb-3">
         <h5 class="text-danger">A2 — Context</h5>
         <textarea id="boxA2" class="form-control" rows="5">{{ overview.A2.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="A2">Save</button></div>
       </div>
     </div>
 
@@ -28,21 +28,18 @@
       <div class="card p-3 mb-3">
         <h5 class="text-primary">B1 — Solution</h5>
         <textarea id="boxB1" class="form-control" rows="6">{{ overview.B1.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="B1">Save</button></div>
       </div>
-
       <div class="card p-3 mb-3">
         <h5 class="text-primary">B2 — Activities</h5>
         <textarea id="boxB2" class="form-control" rows="4">{{ overview.B2.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="B2">Save</button></div>
       </div>
     </div>
 
+    <!-- 🔹 C Section -->
     <div class="col-md-4">
       <div class="card p-3 mb-3">
         <h5 class="text-purple">C1 — Stakeholders</h5>
         <textarea id="boxC1" class="form-control" rows="5">{{ overview.C1.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C1">Save</button></div>
       </div>
     </div>
 
@@ -50,7 +47,6 @@
       <div class="card p-3 mb-3">
         <h5 class="text-purple">C2 — Resources</h5>
         <textarea id="boxC2" class="form-control" rows="5">{{ overview.C2.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C2">Save</button></div>
       </div>
     </div>
 
@@ -58,46 +54,41 @@
       <div class="card p-3 mb-3">
         <h5 class="text-purple">C3 — Dissemination</h5>
         <textarea id="boxC3" class="form-control" rows="5">{{ overview.C3.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="C3">Save</button></div>
       </div>
     </div>
 
+    <!-- 🔸 D Section -->
     <div class="col-md-12">
       <div class="card p-3 mb-3">
         <h5 class="text-warning">D2 — Impact on SDGs</h5>
         <textarea id="boxD2" class="form-control" rows="3">{{ overview.D2.text }}</textarea>
-        <div class="mt-2 text-end"><button class="btn btn-sm btn-primary save-box" data-box="D2">Save</button></div>
       </div>
     </div>
   </div>
-<div class="text-end mt-4">
-    <button id="saveAllBtn" class="btn btn-success">
-      💾 Save & Continue to Dashboard
-    </button>
+
+  <!-- Buttons -->
+  <div class="text-end mt-4 d-flex justify-content-end gap-2">
+    <button id="downloadOverview" class="btn btn-outline-secondary">📄 Download as PDF</button>
+    <button id="saveAllBtn" class="btn btn-success">💾 Save & Continue to Dashboard</button>
   </div>
 </div>
-<div class="text-end mt-3">
-  <button id="downloadOverview" class="btn btn-outline-secondary">📄 Download as PDF</button>
-</div>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const boxes = ["A1","A2","B1","B2","C1","C2","C3","D2"];
   const debounceTimers = {};
-  const saveQueue = new Set();
 
   // ✅ Toast setup
   const toast = document.createElement("div");
-  toast.style.position = "fixed";
-  toast.style.bottom = "20px";
-  toast.style.right = "20px";
-  toast.style.background = "#198754";
-  toast.style.color = "white";
-  toast.style.padding = "8px 16px";
-  toast.style.borderRadius = "8px";
-  toast.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
-  toast.style.display = "none";
-  toast.style.zIndex = "9999";
+  Object.assign(toast.style, {
+    position: "fixed", bottom: "20px", right: "20px", background: "#198754",
+    color: "#fff", padding: "8px 16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+    display: "none", zIndex: "9999"
+  });
   document.body.appendChild(toast);
 
   function showToast(msg) {
@@ -117,36 +108,51 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ box, text }),
       });
       const data = await res.json();
-      if (data.status === "ok") {
-        showToast("Saved ✓");
-      }
+      if (data.status === "ok") showToast("Saved ✓");
     } catch (err) {
       console.error("Save failed:", err);
     }
   }
 
-  // Auto-save when typing stops
+  // 🧠 Auto-save after typing stops
   boxes.forEach((b) => {
     const el = document.getElementById("box" + b);
     el?.addEventListener("input", () => {
       clearTimeout(debounceTimers[b]);
-      debounceTimers[b] = setTimeout(() => {
-        const text = el.value;
-        saveBox(b, text);
-      }, 1500); // 1.5 seconds after stop typing
+      debounceTimers[b] = setTimeout(() => saveBox(b, el.value), 1500);
     });
   });
 
-  // ✅ Manual save all (same as before)
+  // 💾 Save all and go back
   document.getElementById("saveAllBtn").addEventListener("click", async () => {
     for (const b of boxes) {
-      const text = document.getElementById("box" + b).value;
-      await saveBox(b, text);
+      await saveBox(b, document.getElementById("box" + b).value);
     }
     showToast("All saved ✓");
-    window.location.href = "{% url 'dashboard' %}";
+    setTimeout(() => (window.location.href = "{% url 'dashboard' %}"), 1000);
+  });
+
+  // 📄 Download as PDF
+  const downloadBtn = document.getElementById("downloadOverview");
+  downloadBtn.addEventListener("click", async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+    const board = document.getElementById("overviewContainer");
+
+    const canvas = await html2canvas(board, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+    // Add project title + date
+    doc.setFontSize(16);
+    doc.text("{{ project.title }} — Project Overview", 20, 25);
+    doc.setFontSize(10);
+    doc.text("Exported on: " + new Date().toLocaleString(), 20, 40);
+
+    doc.addImage(imgData, "PNG", 0, 50, pageWidth, imgHeight - 30);
+    doc.save("project_overview_{{ project.id }}.pdf");
   });
 });
 </script>
-
 {% endblock %}
