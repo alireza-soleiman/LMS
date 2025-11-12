@@ -74,6 +74,7 @@
 </div>
 
 <!-- Libraries -->
+<!-- 📦 Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -85,8 +86,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // ✅ Toast setup
   const toast = document.createElement("div");
   Object.assign(toast.style, {
-    position: "fixed", bottom: "20px", right: "20px", background: "#198754",
-    color: "#fff", padding: "8px 16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+    position: "fixed", bottom: "20px", right: "20px",
+    background: "#198754", color: "#fff", padding: "8px 16px",
+    borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
     display: "none", zIndex: "9999"
   });
   document.body.appendChild(toast);
@@ -132,27 +134,78 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => (window.location.href = "{% url 'dashboard' %}"), 1000);
   });
 
-  // 📄 Download as PDF
+  // 📄 Generate a clean printable PDF
   const downloadBtn = document.getElementById("downloadOverview");
   downloadBtn.addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
-    const board = document.getElementById("overviewContainer");
+    try {
+      const { jsPDF } = window.jspdf;
+      if (!jsPDF) {
+        alert("jsPDF library not loaded correctly!");
+        return;
+      }
 
-    const canvas = await html2canvas(board, { scale: 2 });
-    const imgData = canvas.toDataURL("image/png");
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+      const margin = 30;
+      let y = 80;
+      const lineHeight = 16;
+      const maxWidth = 500;
 
-    // Add project title + date
-    doc.setFontSize(16);
-    doc.text("{{ project.title }} — Project Overview", 20, 25);
-    doc.setFontSize(10);
-    doc.text("Exported on: " + new Date().toLocaleString(), 20, 40);
+      // 🧾 Header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Project Overview Report", margin, 30);
 
-    doc.addImage(imgData, "PNG", 0, 50, pageWidth, imgHeight - 30);
-    doc.save("project_overview_{{ project.id }}.pdf");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text("Project: {{ project.title }}", margin, 50);
+      doc.text("Generated on: " + new Date().toLocaleString(), margin, 65);
+
+      const sections = [
+        ["A1 — Problem", document.getElementById("boxA1").value, "#dc3545"],
+        ["A2 — Context", document.getElementById("boxA2").value, "#dc3545"],
+        ["B1 — Solution", document.getElementById("boxB1").value, "#0d6efd"],
+        ["B2 — Activities", document.getElementById("boxB2").value, "#0d6efd"],
+        ["C1 — Stakeholders", document.getElementById("boxC1").value, "#6f42c1"],
+        ["C2 — Resources", document.getElementById("boxC2").value, "#6f42c1"],
+        ["C3 — Dissemination", document.getElementById("boxC3").value, "#6f42c1"],
+        ["D2 — Impact on SDGs", document.getElementById("boxD2").value, "#ffc107"],
+      ];
+
+      for (const [title, text, color] of sections) {
+        if (y > 740) { // next page
+          doc.addPage();
+          y = 60;
+        }
+
+        // section title
+        doc.setFillColor(color);
+        doc.rect(margin, y - 10, 8, 8, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text(title, margin + 16, y - 2);
+
+        // text content
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.setTextColor(60, 60, 60);
+        const lines = doc.splitTextToSize(text || "— No input provided —", maxWidth);
+        doc.text(lines, margin, y + 12);
+        y += (lines.length + 2) * lineHeight;
+      }
+
+      // footer
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text("Generated automatically by Workshop LMS", margin, 800);
+
+      doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("An error occurred while generating PDF. Check console for details.");
+    }
   });
 });
 </script>
+
 {% endblock %}
