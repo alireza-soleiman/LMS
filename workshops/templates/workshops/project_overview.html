@@ -1,66 +1,144 @@
 {% extends "base.html" %}
 {% block title %}Project Overview — {{ project.title }}{% endblock %}
 {% block content %}
+
+<style>
+  body {
+    background: #f7f9fc;
+    font-family: "Inter", sans-serif;
+  }
+  .overview-header h3 {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .overview-header a.btn {
+    border-radius: 0.6rem;
+  }
+  .overview-header .text-muted {
+    font-size: 0.9rem;
+  }
+  .card {
+    border: none;
+    border-radius: 0.9rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  }
+  h5 {
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+  textarea {
+    border-radius: 0.6rem;
+    font-size: 0.95rem;
+    background: #fff;
+  }
+  .btn {
+    border-radius: 0.6rem;
+    font-weight: 500;
+  }
+  .btn-outline-secondary {
+    border: 1px solid #cdd6e2;
+  }
+  .btn-outline-secondary:hover {
+    background: #e7edf7;
+  }
+  .btn-success {
+    background-color: #198754;
+    border: none;
+  }
+  .btn-success:hover {
+    background-color: #137347;
+  }
+  .save-toast {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: #198754;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateY(15px);
+    transition: all 0.4s ease;
+    z-index: 9999;
+  }
+  .save-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 3px;
+  }
+</style>
+
 <div class="container py-4" id="overviewContainer">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">{{ project.title }} — Project Info</h3>
+  <div class="d-flex justify-content-between align-items-center mb-3 overview-header">
+    <h3 class="mb-0">{{ project.title }} — Project Overview</h3>
     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
   </div>
   <p class="text-muted">
-    Fill in each section below. Text auto-saves every few seconds.
-    You can also use “Save & Continue” or “Download as PDF”.
+    Fill in each section below. Your inputs auto-save after typing.
+    You can also “Save & Continue” or export your overview as a PDF.
   </p>
 
-  <!-- 🔸 A/B Section -->
   <div class="row g-3">
+    <!-- 🔸 A/B Section -->
     <div class="col-md-6">
-      <div class="card p-3 mb-3">
-        <h5 class="text-danger">A1 — Problem</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-danger-subtle">
+        <div class="section-label text-danger">A1 — Problem</div>
         <textarea id="boxA1" class="form-control" rows="6">{{ overview.A1.text }}</textarea>
       </div>
-      <div class="card p-3 mb-3">
-        <h5 class="text-danger">A2 — Context</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-danger-subtle">
+        <div class="section-label text-danger">A2 — Context</div>
         <textarea id="boxA2" class="form-control" rows="5">{{ overview.A2.text }}</textarea>
       </div>
     </div>
 
     <div class="col-md-6">
-      <div class="card p-3 mb-3">
-        <h5 class="text-primary">B1 — Solution</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-primary-subtle">
+        <div class="section-label text-primary">B1 — Solution</div>
         <textarea id="boxB1" class="form-control" rows="6">{{ overview.B1.text }}</textarea>
       </div>
-      <div class="card p-3 mb-3">
-        <h5 class="text-primary">B2 — Activities</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-primary-subtle">
+        <div class="section-label text-primary">B2 — Activities</div>
         <textarea id="boxB2" class="form-control" rows="4">{{ overview.B2.text }}</textarea>
       </div>
     </div>
 
     <!-- 🔹 C Section -->
     <div class="col-md-4">
-      <div class="card p-3 mb-3">
-        <h5 class="text-purple">C1 — Stakeholders</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-purple">
+        <div class="section-label" style="color:#6f42c1;">C1 — Stakeholders</div>
         <textarea id="boxC1" class="form-control" rows="5">{{ overview.C1.text }}</textarea>
       </div>
     </div>
 
     <div class="col-md-4">
-      <div class="card p-3 mb-3">
-        <h5 class="text-purple">C2 — Resources</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-purple">
+        <div class="section-label" style="color:#6f42c1;">C2 — Resources</div>
         <textarea id="boxC2" class="form-control" rows="5">{{ overview.C2.text }}</textarea>
       </div>
     </div>
 
     <div class="col-md-4">
-      <div class="card p-3 mb-3">
-        <h5 class="text-purple">C3 — Dissemination</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-purple">
+        <div class="section-label" style="color:#6f42c1;">C3 — Dissemination</div>
         <textarea id="boxC3" class="form-control" rows="5">{{ overview.C3.text }}</textarea>
       </div>
     </div>
 
     <!-- 🔸 D Section -->
     <div class="col-md-12">
-      <div class="card p-3 mb-3">
-        <h5 class="text-warning">D2 — Impact on SDGs</h5>
+      <div class="card p-3 mb-3 border-start border-4 border-warning-subtle">
+        <div class="section-label text-warning">D2 — Impact on SDGs</div>
         <textarea id="boxD2" class="form-control" rows="3">{{ overview.D2.text }}</textarea>
       </div>
     </div>
@@ -69,12 +147,13 @@
   <!-- Buttons -->
   <div class="text-end mt-4 d-flex justify-content-end gap-2">
     <button id="downloadOverview" class="btn btn-outline-secondary">📄 Download as PDF</button>
-    <button id="saveAllBtn" class="btn btn-success">💾 Save & Continue to Dashboard</button>
+    <button id="saveAllBtn" class="btn btn-success">💾 Save & Continue</button>
   </div>
 </div>
 
+<div class="save-toast" id="saveToast">Saved ✓</div>
+
 <!-- Libraries -->
-<!-- 📦 Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -82,21 +161,12 @@
 document.addEventListener("DOMContentLoaded", () => {
   const boxes = ["A1","A2","B1","B2","C1","C2","C3","D2"];
   const debounceTimers = {};
+  const toast = document.getElementById("saveToast");
 
-  // ✅ Toast setup
-  const toast = document.createElement("div");
-  Object.assign(toast.style, {
-    position: "fixed", bottom: "20px", right: "20px",
-    background: "#198754", color: "#fff", padding: "8px 16px",
-    borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-    display: "none", zIndex: "9999"
-  });
-  document.body.appendChild(toast);
-
-  function showToast(msg) {
+  function showToast(msg="Saved ✓") {
     toast.textContent = msg;
-    toast.style.display = "block";
-    setTimeout(() => (toast.style.display = "none"), 2000);
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1800);
   }
 
   async function saveBox(box, text) {
@@ -110,22 +180,22 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ box, text }),
       });
       const data = await res.json();
-      if (data.status === "ok") showToast("Saved ✓");
+      if (data.status === "ok") showToast();
     } catch (err) {
       console.error("Save failed:", err);
     }
   }
 
-  // 🧠 Auto-save after typing stops
-  boxes.forEach((b) => {
+  // Auto-save when typing stops
+  boxes.forEach(b => {
     const el = document.getElementById("box" + b);
     el?.addEventListener("input", () => {
       clearTimeout(debounceTimers[b]);
-      debounceTimers[b] = setTimeout(() => saveBox(b, el.value), 1500);
+      debounceTimers[b] = setTimeout(() => saveBox(b, el.value), 1200);
     });
   });
 
-  // 💾 Save all and go back
+  // Save all and redirect
   document.getElementById("saveAllBtn").addEventListener("click", async () => {
     for (const b of boxes) {
       await saveBox(b, document.getElementById("box" + b).value);
@@ -134,76 +204,52 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => (window.location.href = "{% url 'dashboard' %}"), 1000);
   });
 
-  // 📄 Generate a clean printable PDF
-  const downloadBtn = document.getElementById("downloadOverview");
-  downloadBtn.addEventListener("click", async () => {
-    try {
-      const { jsPDF } = window.jspdf;
-      if (!jsPDF) {
-        alert("jsPDF library not loaded correctly!");
-        return;
-      }
+  // Generate PDF
+  document.getElementById("downloadOverview").addEventListener("click", async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+    const margin = 30;
+    let y = 70;
+    const lineHeight = 15;
+    const maxWidth = 500;
 
-      const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
-      const margin = 30;
-      let y = 80;
-      const lineHeight = 16;
-      const maxWidth = 500;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Project Overview Report", margin, 30);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text("Project: {{ project.title }}", margin, 50);
+    doc.text("Generated on: " + new Date().toLocaleString(), margin, 65);
 
-      // 🧾 Header
+    const sections = [
+      ["A1 — Problem", document.getElementById("boxA1").value, "#dc3545"],
+      ["A2 — Context", document.getElementById("boxA2").value, "#dc3545"],
+      ["B1 — Solution", document.getElementById("boxB1").value, "#0d6efd"],
+      ["B2 — Activities", document.getElementById("boxB2").value, "#0d6efd"],
+      ["C1 — Stakeholders", document.getElementById("boxC1").value, "#6f42c1"],
+      ["C2 — Resources", document.getElementById("boxC2").value, "#6f42c1"],
+      ["C3 — Dissemination", document.getElementById("boxC3").value, "#6f42c1"],
+      ["D2 — Impact on SDGs", document.getElementById("boxD2").value, "#ffc107"],
+    ];
+
+    for (const [title, text, color] of sections) {
+      if (y > 760) { doc.addPage(); y = 60; }
+      doc.setFillColor(color);
+      doc.rect(margin, y - 8, 6, 6, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Project Overview Report", margin, 30);
-
+      doc.setFontSize(14);
+      doc.text(title, margin + 14, y - 1);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
-      doc.text("Project: {{ project.title }}", margin, 50);
-      doc.text("Generated on: " + new Date().toLocaleString(), margin, 65);
-
-      const sections = [
-        ["A1 — Problem", document.getElementById("boxA1").value, "#dc3545"],
-        ["A2 — Context", document.getElementById("boxA2").value, "#dc3545"],
-        ["B1 — Solution", document.getElementById("boxB1").value, "#0d6efd"],
-        ["B2 — Activities", document.getElementById("boxB2").value, "#0d6efd"],
-        ["C1 — Stakeholders", document.getElementById("boxC1").value, "#6f42c1"],
-        ["C2 — Resources", document.getElementById("boxC2").value, "#6f42c1"],
-        ["C3 — Dissemination", document.getElementById("boxC3").value, "#6f42c1"],
-        ["D2 — Impact on SDGs", document.getElementById("boxD2").value, "#ffc107"],
-      ];
-
-      for (const [title, text, color] of sections) {
-        if (y > 740) { // next page
-          doc.addPage();
-          y = 60;
-        }
-
-        // section title
-        doc.setFillColor(color);
-        doc.rect(margin, y - 10, 8, 8, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        doc.text(title, margin + 16, y - 2);
-
-        // text content
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        doc.setTextColor(60, 60, 60);
-        const lines = doc.splitTextToSize(text || "— No input provided —", maxWidth);
-        doc.text(lines, margin, y + 12);
-        y += (lines.length + 2) * lineHeight;
-      }
-
-      // footer
-      doc.setFontSize(10);
-      doc.setTextColor(150, 150, 150);
-      doc.text("Generated automatically by Workshop LMS", margin, 800);
-
-      doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      alert("An error occurred while generating PDF. Check console for details.");
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(text || "— No input provided —", maxWidth);
+      doc.text(lines, margin, y + 12);
+      y += (lines.length + 2) * lineHeight;
     }
+
+    doc.setFontSize(10);
+    doc.setTextColor(140);
+    doc.text("Generated automatically by LMS Platform", margin, 820);
+    doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
   });
 });
 </script>
