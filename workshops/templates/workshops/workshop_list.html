@@ -1,101 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>My Workshops</title>
+{% extends "base.html" %}
+{% block title %}Workshops — {{ project.title }}{% endblock %}
+{% block content %}
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body {
+    background: #f8fafc;
+    font-family: "Inter", sans-serif;
+  }
+  h2 {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .page-header a {
+    border-radius: 0.5rem;
+  }
+  .card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    transition: all 0.25s ease;
+    height: 100%;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  }
+  .workshop-icon {
+    font-size: 1.9rem;
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    margin-bottom: 0.8rem;
+  }
+  .icon-red { background: #dc3545; }
+  .icon-blue { background: #0d6efd; }
+  .icon-green { background: #198754; }
+  .icon-yellow { background: #ffc107; color: #000; }
+  .card h5 {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .card p {
+    color: #6b7280;
+    font-size: 0.95rem;
+    min-height: 50px;
+  }
+  .btn {
+    border-radius: 0.5rem;
+    font-weight: 500;
+  }
+  .btn-outline-primary:hover {
+    background: #2563eb;
+    color: #fff;
+  }
+  .progress {
+    height: 6px;
+    border-radius: 10px;
+    background-color: #e2e8f0;
+  }
+  .progress-bar {
+    background: linear-gradient(90deg, #2563eb, #4f46e5);
+  }
+</style>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<div class="container py-4">
+  <div class="page-header">
+    <h2>📘 {{ project.title }} — Workshops</h2>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
+  </div>
 
-    <style>
-        body {
-            background-color: #f8f9fa; /* Light gray background */
-        }
-        .header-bar {
-            background-color: #343a40; /* Dark header */
-            color: white;
-            padding: 1.5rem 2rem;
-            margin-bottom: 2rem;
-        }
-        .header-bar h1 {
-            margin: 0;
-            font-weight: 300;
-        }
-        /* Style for the links in the list */
-        .module-link {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1.1rem;
-            color: #212529;
-            text-decoration: none;
-            transition: background-color 0.15s ease-in-out;
-        }
-        .module-link:hover {
-            background-color: #f1f1f1;
-            color: #0056b3;
-        }
-        .module-link .module-icon {
-            color: #0d6efd; /* Bootstrap primary blue */
-            font-size: 1.5rem;
-            margin-right: 1rem;
-        }
-        .module-link .go-icon {
-            font-size: 1.2rem;
-            color: #6c757d; /* Muted gray for the arrow */
-        }
-    </style>
-</head>
-<body>
+  <p class="text-muted mb-4">
+    Complete each workshop step-by-step. Your progress is saved automatically.
+  </p>
 
-    <div class="header-bar shadow-sm">
-        <div class="container-fluid">
-            <h1>My Workshops</h1>
+  <div class="row g-4">
+    <!-- Workshop 1 -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="workshop-icon icon-red">👥</div>
+        <h5>Workshop 1</h5>
+        <p>Stakeholder Analysis: identify and rate key stakeholders by power and interest.</p>
+        <div class="progress mb-3">
+          <div class="progress-bar" style="width: {{ ws_flags.ws1|default:0|yesno:'100,0' }}%"></div>
         </div>
+        <a href="{% url 'stakeholder_list' project.id %}" class="btn btn-outline-primary w-100">
+          {% if ws_flags.ws1 %}Review{% else %}Start{% endif %}
+        </a>
+      </div>
     </div>
 
-    <div class="container-fluid">
-        <div class="row">
-            {% for project in projects %}
-                <div class="col-lg-8 offset-lg-2">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white py-3">
-                            <h2 class="h4 mb-0">{{ project.title }}</h2>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="list-group list-group-flush">
-                                <a href="{% url 'stakeholder_list' project.id %}" class="list-group-item list-group-item-action module-link p-3">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-people-fill module-icon"></i>
-                                        <span>Stakeholder Analysis</span>
-                                    </div>
-                                    <i class="bi bi-chevron-right go-icon"></i>
-                                </a>
-
-                                <a href="{% url 'problem_tree' project.id %}" class="list-group-item list-group-item-action module-link p-3">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-diagram-2-fill module-icon"></i>
-                                        <span>Problem Tree Analysis</span>
-                                    </div>
-                                    <i class="bi bi-chevron-right go-icon"></i>
-                                </a>
-
-                                </div>
-                        </div>
-                    </div>
-                </div>
-            {% empty %}
-                <div class="col-lg-8 offset-lg-2">
-                    <div class="alert alert-info" role="alert">
-                        There are currently no projects assigned to you.
-                    </div>
-                </div>
-            {% endfor %}
+    <!-- Workshop 2 -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="workshop-icon icon-blue">🌳</div>
+        <h5>Workshop 2</h5>
+        <p>Problem Tree Analysis: build your core problem, causes, and effects visually.</p>
+        <div class="progress mb-3">
+          <div class="progress-bar" style="width: {{ ws_flags.ws2|default:0|yesno:'100,0' }}%"></div>
         </div>
+        <a href="{% url 'problem_tree' project.id %}" class="btn btn-outline-primary w-100">
+          {% if ws_flags.ws2 %}Review{% else %}Start{% endif %}
+        </a>
+      </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    <!-- Workshop 3 -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="workshop-icon icon-green">📊</div>
+        <h5>Workshop 3</h5>
+        <p>Indicators & Ranking: Delphi selection and SRF “playing card” prioritization.</p>
+        <div class="progress mb-3">
+          <div class="progress-bar" style="width: {{ ws_flags.ws3|default:0|yesno:'100,0' }}%"></div>
+        </div>
+        <a href="{% url 'indicator_selection' project.id %}" class="btn btn-outline-primary w-100">
+          {% if ws_flags.ws3 %}Review{% else %}Start{% endif %}
+        </a>
+      </div>
+    </div>
+
+    <!-- Workshop 4 -->
+    <div class="col-md-6 col-lg-3">
+      <div class="card p-3 text-center">
+        <div class="workshop-icon icon-yellow">💡</div>
+        <h5>Workshop 4</h5>
+        <p>SWOT Analysis: summarize your project’s strengths, weaknesses, opportunities, and threats.</p>
+        <div class="progress mb-3">
+          <div class="progress-bar" style="width: {{ ws_flags.ws4|default:0|yesno:'100,0' }}%"></div>
+        </div>
+        <a href="{% url 'swot_analysis' project.id %}" class="btn btn-outline-primary w-100">
+          {% if ws_flags.ws4 %}Review{% else %}Start{% endif %}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center mt-5">
+    <a href="{% url 'project_overview' project.id %}" class="btn btn-outline-secondary me-2">← Back to Overview</a>
+    <a href="#" class="btn btn-success px-4">✅ Finish & Export Report</a>
+  </div>
+</div>
+
+{% endblock %}
