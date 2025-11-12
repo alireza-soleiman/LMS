@@ -3,7 +3,7 @@ from . import views
 from .views import ranking_page_view, save_swot_entry, swot_analysis_view
 
 urlpatterns = [
-    path('', views.workshop_list, name='workshop_list'),
+    path('project/<int:project_id>/workshops/', views.workshop_list_view, name='workshop_list'),
     path('project/<int:project_id>/stakeholders/', views.stakeholder_list, name='stakeholder_list'),
     path('project/<int:project_id>/stakeholders/download/', views.download_stakeholders_csv,
          name='download_stakeholders'),
