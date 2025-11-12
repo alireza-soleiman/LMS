@@ -3,115 +3,162 @@
 {% block title %}SRF Playing Cards — {{ project.title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-lg-8">
-      <h3>🎴 SRF Method — Playing Cards</h3>
-    <hr class="my-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="display-5 fw-bold mb-1">Workshop 3 — Indicator Ranking (SRF Method)</h1>
+    <p class="fs-5 text-muted mb-0">
+      Rank and group indicators like playing cards 🎴.
+      Drag to reorder → use “⬜ White Card” for gaps → merge equals with “🔗”.
+    </p>
+  </div>
+  <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
+    ← Back to Workshops
+  </a>
+</div>
+<hr class="my-4">
+
 <div class="alert alert-info">
   <h5>🧩 How the SRF (Simos) Method Works</h5>
   <p>
-    In this step, you <strong>rank indicators</strong> by dragging their cards from top (most important)
-    to bottom (least important). If two indicators are equally important,
-    <strong>merge them into a group</strong> using “🔗 Merge Selected”.
+    Drag the cards to rank indicators by importance. Use “⬜ White Cards” to indicate importance gaps
+    and “🔗 Merge Selected” for equal-importance indicators.
   </p>
   <p>
-    Use <strong>⬜ White Cards</strong> to show importance gaps between groups.
-    Each white card represents a step increase in perceived importance.
-  </p>
-  <p>
-    When you click <strong>💾 Save SRF Weights</strong>, the system calculates weights automatically:
-    it assigns scores based on your order and gaps, then normalizes them so total weight = 1.0.
-  </p>
-  <p class="mb-0">
-    This method is part of the <em>Revised Simos procedure</em> (SRF),
-    often used in Multi-Criteria Decision Making (MCDM) to turn subjective rankings into quantitative weights.
+    Click “💾 Save SRF Weights” to compute and save weights automatically.
+    This method converts qualitative rankings into quantitative weights using the Revised Simos procedure.
   </p>
 </div>
 
-
-      <!-- 🎯 Buttons -->
-      <div class="text-center mb-3">
-        <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">⬜ Add White Card (Gap)</button>
-        <button id="mergeCards" class="btn btn-outline-primary btn-sm">🔗 Merge Selected (Equal Importance)</button>
-          <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
-      ← Back to Workshops
-    </a>
-      </div>
-
-      <!-- 🎴 Main board -->
-      <div id="board" class="p-3 bg-light rounded shadow-sm d-flex flex-column gap-3">
-        {% for ind in indicators %}
-        <div class="card srf-card" data-id="{{ ind.id }}">
-          <div class="card-body p-2">
-            <h6 class="mb-1">{{ ind.name }}</h6>
-            <small class="text-muted">{{ ind.criterion }}</small><br>
-            <small>{{ ind.description|truncatewords:10 }}</small>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
+<!-- 🎯 Buttons -->
+<div class="text-center mb-3">
+  <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">⬜ Add White Card (Gap)</button>
+  <button id="mergeCards" class="btn btn-outline-primary btn-sm">🔗 Merge Selected (Equal Importance)</button>
+  <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
+    ← Back to Workshops
+  </a>
+</div>
+<div class="text-center mb-2">
+  <span class="badge bg-danger-subtle text-danger fs-6 px-3 py-2">⬆ Most Important (Top of Board)</span>
+</div>
+<!-- 🎴 Main board -->
+<div id="board" class="p-3 bg-light rounded shadow-sm">
+  {% for ind in indicators %}
+  <div class="card srf-card" data-id="{{ ind.id }}">
+    <div class="card-body d-flex align-items-center justify-content-center text-center p-3">
+      <h6 class="mb-0">{{ ind.name }}</h6>
     </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="text-center mt-2">
+  <span class="badge bg-primary-subtle text-primary fs-6 px-3 py-2">⬇ Less Important (Bottom of Board)</span>
+</div>
+<div class="d-flex justify-content-between mt-3">
+  <span class="fw-bold text-danger ms-4">⬇️ Most Important</span>
+  <span class="fw-bold text-secondary me-4">Less Important ⬆️</span>
+</div>
 
-
-    <!-- 💡 Right panel -->
-    <div class="col-lg-4">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">💡 SRF Weight Summary</h5>
-          <div id="summaryTable" class="small"></div>
-          <button id="saveBtn" class="btn btn-primary w-100 mt-3">💾 Save SRF Weights</button>
-        </div>
-      </div>
+<!-- 💡 Right panel -->
+<div class="col-lg-4 mt-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">💡 SRF Weight Summary</h5>
+      <div id="summaryTable" class="small"></div>
+      <button id="saveBtn" class="btn btn-primary w-100 mt-3">💾 Save SRF Weights</button>
     </div>
   </div>
 </div>
 
 <!-- 🎨 Styles -->
 <style>
+/* === Diagonal board layout === */
 #board {
-  min-height: 300px;
-}
-.srf-card {
-  cursor: grab;
-  border-radius: 10px;
-  border: 2px solid #ddd;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  transition: transform 0.15s ease;
-}
-.srf-card.dragging {
-  opacity: 0.6;
-  transform: scale(1.05);
-}
-.white-card {
-  text-align: center;
-  padding: 10px;
-  border: 2px dashed #aaa;
-  border-radius: 8px;
-  background: repeating-linear-gradient(
-    45deg,
-    #fff,
-    #fff 10px,
-    #f0f0f0 10px,
-    #f0f0f0 20px
+  min-height: 600px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 25px 30px;
+  justify-items: center;
+  align-items: start;
+  padding: 60px 40px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow-y: auto;
+  max-height: 80vh;
+
+  /* 🌈 Visual gradient showing importance */
+  background: linear-gradient(
+    to bottom,
+    #fff3f3 0%,       /* red tint = most important */
+    #f8fafc 50%,      /* neutral middle */
+    #e9f5ff 100%      /* blue tint = less important */
   );
-  cursor: grab;
 }
-.group-card {
+/* 🔳 White card “gap” — elegant separator between importance levels */
+.white-card {
+  width: 220px;
+  height: 120px;
+  border-radius: 12px;
+  border: 2px dashed #9ca3af;
+  background: repeating-linear-gradient(
+    135deg,
+    #ffffff,
+    #ffffff 12px,
+    #f1f5f9 12px,
+    #f1f5f9 24px
+  );
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  border: 2px solid #aaa;
-  border-radius: 10px;
-  padding: 6px;
-  background: #f9f9f9;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  position: relative;
 }
+
+.white-card::before {
+  content: "⬜ WHITE CARD";
+  font-size: 0.8rem;
+  color: #64748b;
+  position: absolute;
+  top: 8px;
+  letter-spacing: 0.5px;
+}
+
+.white-card::after {
+  content: "Importance gap ↑";
+  font-size: 0.75rem;
+  color: #94a3b8;
+  position: absolute;
+  bottom: 8px;
+  font-style: italic;
+}
+
+.white-card:hover {
+  transform: translateY(-3px) scale(1.03);
+  border-color: #475569;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  background: repeating-linear-gradient(
+    135deg,
+    #fafafa,
+    #fafafa 12px,
+    #e2e8f0 12px,
+    #e2e8f0 24px
+  );
+}
+/* 🔵 Highlight selected cards for merging */
 .srf-card.selected {
-  border-color: #007bff;
-  box-shadow: 0 0 6px #007bff;
+  outline: 3px solid #2563eb;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+  transform: scale(1.03);
+  z-index: 10;
 }
+
 </style>
+
 <!-- 📦 SortableJS + html2canvas -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -127,6 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     animation: 150,
     ghostClass: 'dragging',
     handle: '.srf-card, .white-card, .group-card',
+    onSort: updateCardOffsets
   });
 
   // ✅ Add white card
@@ -135,14 +183,31 @@ document.addEventListener("DOMContentLoaded", () => {
     white.className = "white-card";
     white.textContent = "⬜ White Card (Gap)";
     board.appendChild(white);
+    updateCardOffsets();
   });
 
   // ✅ Select cards by clicking
-  board.addEventListener("click", e => {
-    const card = e.target.closest(".srf-card");
-    if (!card) return;
-    card.classList.toggle("selected");
-  });
+ // ✅ Select multiple cards (for merge) with safe click detection
+board.addEventListener("click", e => {
+  // Ignore clicks on buttons or inputs (like 🎨 or color picker)
+  if (e.target.closest("button") || e.target.closest("input")) return;
+
+  const card = e.target.closest(".srf-card");
+  if (!card) return;
+
+  // Toggle selection
+  card.classList.toggle("selected");
+
+  // Add a subtle visual pulse to confirm selection
+  if (card.classList.contains("selected")) {
+    card.style.outline = "3px solid #2563eb";
+    card.style.boxShadow = "0 0 12px rgba(37,99,235,0.4)";
+  } else {
+    card.style.outline = "";
+    card.style.boxShadow = "";
+  }
+});
+
 
   // ✅ Merge selected indicator cards
   mergeBtn.addEventListener("click", () => {
@@ -167,22 +232,39 @@ document.addEventListener("DOMContentLoaded", () => {
       group: "shared",
       animation: 150,
       handle: '.srf-card',
+      onSort: updateCardOffsets
     });
+    updateCardOffsets();
   });
 
-  // === 🎨 COLOR PICKER (with emoji icon) + PNG DOWNLOAD ===
+  // === Natural rotation for realism ===
+  document.querySelectorAll('.srf-card').forEach(card => {
+    const deg = (Math.random() * 3 - 1.5).toFixed(1);
+    card.style.setProperty('--r', `${deg}deg`);
+  });
+
+  // === Diagonal offset update ===
+  function updateCardOffsets() {
+    document.querySelectorAll('#board > *').forEach((el, i) => {
+      el.style.setProperty('--i', i);
+    });
+  }
+  updateCardOffsets();
+
+  const observer = new MutationObserver(updateCardOffsets);
+  observer.observe(board, { childList: true, subtree: true });
+
+  // === Color pickers and PNG download ===
   function addColorPickers() {
     board.querySelectorAll(".srf-card").forEach(card => {
       if (card.querySelector(".color-btn")) return;
 
-      // Create invisible color input
       const colorInput = document.createElement("input");
       colorInput.type = "color";
       colorInput.className = "color-input";
       colorInput.value = card.dataset.color || "#ffffff";
       colorInput.style.display = "none";
 
-      // Create emoji button that triggers color input
       const emojiBtn = document.createElement("button");
       emojiBtn.className = "btn btn-sm btn-outline-secondary color-btn";
       emojiBtn.innerHTML = "🎨";
@@ -192,15 +274,13 @@ document.addEventListener("DOMContentLoaded", () => {
       emojiBtn.style.right = "5px";
       emojiBtn.style.padding = "2px 6px";
       emojiBtn.style.fontSize = "14px";
-      emojiBtn.style.lineHeight = "1";
-      emojiBtn.style.borderRadius = "6px";
 
-      emojiBtn.addEventListener("click", (e) => {
+      emojiBtn.addEventListener("click", e => {
         e.stopPropagation();
-        colorInput.click(); // open native color picker
+        colorInput.click();
       });
 
-      colorInput.addEventListener("input", (e) => {
+      colorInput.addEventListener("input", e => {
         const color = e.target.value;
         card.style.backgroundColor = color;
         card.dataset.color = color;
@@ -213,7 +293,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 💾 Save colors
   function saveCardColors() {
     const colors = {};
     board.querySelectorAll(".srf-card").forEach(card => {
@@ -222,7 +301,6 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("cardColors", JSON.stringify(colors));
   }
 
-  // 🔁 Restore colors
   function loadCardColors() {
     const saved = JSON.parse(localStorage.getItem("cardColors") || "{}");
     board.querySelectorAll(".srf-card").forEach(card => {
@@ -234,11 +312,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 📸 Download as PNG
   const downloadBtn = document.createElement("button");
   downloadBtn.className = "btn btn-success mt-3";
   downloadBtn.innerHTML = "📸 Download Cards as PNG";
-  document.querySelector(".col-lg-8").appendChild(downloadBtn);
+  document.querySelector(".col-lg-4").appendChild(downloadBtn);
 
   downloadBtn.addEventListener("click", async () => {
     downloadBtn.disabled = true;
@@ -249,20 +326,17 @@ document.addEventListener("DOMContentLoaded", () => {
       link.download = `project_{{ project.id }}_srf_cards.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
-    } catch (err) {
-      alert("Error generating PNG: " + err.message);
     } finally {
       downloadBtn.disabled = false;
       downloadBtn.innerText = "📸 Download Cards as PNG";
     }
   });
 
-  // Initialize
   addColorPickers();
   loadCardColors();
 });
-<!-- === 🧮 SRF Weight Calculation & Save === -->
-
+</script>
+<script>
 document.addEventListener("DOMContentLoaded", () => {
   const saveBtn = document.getElementById("saveBtn");
   const summary = document.getElementById("summaryTable");
@@ -290,34 +364,35 @@ document.addEventListener("DOMContentLoaded", () => {
     return { order, groups };
   }
 
-  // 📊 Compute SRF-style weights
-  function computeWeights(order, groups) {
-    let score = 1;
-    const scores = [];
-    const resultIds = [];
+ // 📊 Compute SRF-style weights so TOP cards get higher weights.
+// We traverse from bottom -> top. A "gap" (white card) increases the jump.
+function computeWeights(order, groups) {
+  let rank = 1;                    // least important starts at 1
+  const scores = {};
+  const idsInDomOrder = [];
 
-    for (let i = 0; i < order.length; i++) {
-      const item = order[i];
-      if (item === "gap") {
-        score += 1; // each white card adds a gap
-        continue;
-      }
-      scores.push(score);
-      resultIds.push(item);
-      if (order[i + 1] !== "gap" && order[i + 1] !== undefined) {
-        score += 1;
-      }
+  for (let i = order.length - 1; i >= 0; i--) {
+    const item = order[i];
+
+    if (item === "gap") {          // a white card creates an extra step
+      rank += 1;
+      continue;
     }
 
-    const total = scores.reduce((a, b) => a + b, 0);
-    const weights = {};
-    resultIds.forEach((id, i) => {
-      weights[id] = (scores[i] / total).toFixed(4);
-    });
-    return weights;
+    scores[item] = rank;           // assign current rank
+    idsInDomOrder.push(item);
+    rank += 1;                     // next item up the board is more important
   }
 
-  // 🧾 Display weights with indicator names
+  const total = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
+  const weights = {};
+  for (const [id, sc] of Object.entries(scores)) {
+    weights[id] = (sc / total).toFixed(4);
+  }
+  return weights;
+}
+
+  // 🧾 Render results in the summary table
   function renderSummary(weights) {
     const rows = Object.entries(weights)
       .map(([id, w]) => {
@@ -344,6 +419,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 💾 Save & compute weights
   saveBtn.addEventListener("click", () => {
     const { order, groups } = getRankingData();
+
+    if (!order.length) {
+      alert("⚠️ No indicators detected! Make sure cards are on the board.");
+      return;
+    }
+
     const weights = computeWeights(order, groups);
     renderSummary(weights);
 
@@ -360,14 +441,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.status === "success") {
           alert("✅ SRF weights calculated and saved successfully!");
         } else {
-          alert("⚠️ Error saving weights: " + data.message);
+          alert("⚠️ Error saving weights: " + (data.message || "Unknown issue"));
+          console.error(data);
         }
       })
-      .catch(err => alert("❌ Network error: " + err));
+      .catch(err => {
+        console.error("Network error:", err);
+        alert("❌ Network error. Please try again.");
+      });
   });
 });
-
-
 </script>
 
 {% endblock %}
