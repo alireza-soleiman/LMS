@@ -201,7 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await saveBox(b, document.getElementById("box" + b).value);
     }
     showToast("All saved ✓");
-    setTimeout(() => (window.location.href = "{% url 'workshop_list' card.project.id %}"), 1500);
+    setTimeout(() => (window.location.href = "{% url 'workshop_list' project.id %}"), 1500);
   });
 
   // Generate PDF
