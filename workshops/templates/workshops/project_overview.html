@@ -135,14 +135,70 @@
       </div>
     </div>
 
-    <!-- 🔸 D Section -->
-    <div class="col-md-12">
-      <div class="card p-3 mb-3 border-start border-4 border-warning-subtle">
-        <div class="section-label text-warning">D2 — Impact on SDGs</div>
-        <textarea id="boxD2" class="form-control" rows="3">{{ overview.D2.text }}</textarea>
+<!-- 🔸 D2 Section: Interactive SDG Selector -->
+<div class="col-md-12">
+  <div class="card p-3 mb-3 border-start border-4 border-warning-subtle">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="section-label text-warning">D2 — Impact on SDGs</div>
+      <button id="openSdgSelector" class="btn btn-outline-warning btn-sm">🌍 Choose SDGs</button>
+    </div>
+
+    <!-- This will be populated by JavaScript -->
+    <div id="selectedSdgs" class="d-flex flex-wrap gap-2 mb-2"></div>
+
+    <textarea id="boxD2" class="form-control" rows="2"
+              placeholder="Selected SDG numbers (auto-filled)">
+      {{ overview.D2.text }}
+    </textarea>
+  </div>
+</div>
+
+
+<!-- 🔹 SDG Selection Modal -->
+<div class="modal fade" id="sdgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning-subtle">
+        <h5 class="modal-title">🌍 Select Relevant SDGs</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="sdgGrid" class="row g-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="saveSdgs" class="btn btn-warning">Save Selection</button>
       </div>
     </div>
   </div>
+</div>
+
+<style>
+.sdg-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  object-fit: cover;
+}
+.sdg-icon:hover {
+  transform: scale(1.05);
+  border-color: #ffc107;
+}
+.sdg-icon.selected {
+  border-color: #07ff1c;
+  box-shadow: 0 0 8px rgb(7, 255, 28);
+}
+.selected-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 4px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+</style>
+
 
   <!-- Buttons -->
   <div class="text-end mt-4 d-flex justify-content-end gap-2">
@@ -250,6 +306,69 @@ document.addEventListener("DOMContentLoaded", () => {
     doc.setTextColor(140);
     doc.text("Generated automatically by LMS Platform", margin, 820);
     doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
+  });
+});
+
+
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const sdgs = [
+    "No Poverty","Zero Hunger","Good Health and Well-being","Quality Education","Gender Equality",
+    "Clean Water and Sanitation","Affordable and Clean Energy","Decent Work and Economic Growth",
+    "Industry, Innovation and Infrastructure","Reduced Inequalities","Sustainable Cities and Communities",
+    "Responsible Consumption and Production","Climate Action","Life Below Water","Life on Land",
+    "Peace, Justice and Strong Institutions","Partnerships for the Goals"
+  ];
+
+  const sdgGrid = document.getElementById("sdgGrid");
+  const selectedContainer = document.getElementById("selectedSdgs");
+  const textarea = document.getElementById("boxD2");
+  const modal = new bootstrap.Modal(document.getElementById("sdgModal"));
+  const openBtn = document.getElementById("openSdgSelector");
+  const saveBtn = document.getElementById("saveSdgs");
+
+  // Populate SDG Grid
+  sdgs.forEach((name, i) => {
+    const id = i + 1;
+    const col = document.createElement("div");
+    col.className = "col-6 col-md-3 text-center";
+    col.innerHTML = `
+      <div class="sdg-item">
+        <img src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-${String(id).padStart(2,'0')}.jpg"
+             alt="${name}" title="${name}"
+             class="sdg-icon" data-id="${id}">
+        <div class="small mt-1">${name}</div>
+      </div>`;
+    sdgGrid.appendChild(col);
+  });
+
+  // Preselect from textarea (if already saved)
+  const preselected = (textarea.value || "")
+    .split(",")
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  const sdgIcons = sdgGrid.querySelectorAll(".sdg-icon");
+  sdgIcons.forEach(icon => {
+    if (preselected.includes(icon.dataset.id)) icon.classList.add("selected");
+    icon.addEventListener("click", () => icon.classList.toggle("selected"));
+  });
+
+  openBtn.addEventListener("click", () => modal.show());
+
+  // Save selected SDGs
+  saveBtn.addEventListener("click", () => {
+    const selected = [...sdgGrid.querySelectorAll(".sdg-icon.selected")].map(el => el.dataset.id);
+    textarea.value = selected.join(",");
+    selectedContainer.innerHTML = selected
+      .map(id => `<img src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-${String(id).padStart(2,'0')}.jpg"
+                        title="SDG ${id}" class="sdg-icon selected-icon">`)
+      .join("");
+    modal.hide();
+
+    // Trigger auto-save
+    textarea.dispatchEvent(new Event("input"));
   });
 });
 </script>
