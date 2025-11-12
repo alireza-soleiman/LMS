@@ -54,7 +54,10 @@
 </style>
 
 <div class="dashboard-container">
-  {% if projects %}
+{% if project_cards %}
+    {% for card in project_cards %}
+  {{ card.project.title }}
+{% endfor %}
     <!-- This branch will be used later when user has projects -->
     <div class="dashboard-card">
       <h2>Welcome back, {{ user.username }} 👋</h2>
