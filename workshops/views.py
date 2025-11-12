@@ -210,16 +210,21 @@ def problem_tree_data(request, project_id):
 # -------------------------
 # Workshop List / Projects
 # -------------------------
-from django.contrib.auth.decorators import login_required
 
 @login_required
-def workshop_list(request):
-    if request.user.is_staff:
-        projects = Project.objects.all().order_by('title')  # admin sees all
-    else:
-        projects = Project.objects.filter(owner=request.user).order_by('title')
+def workshop_list_view(request, project_id):
+    project = get_object_or_404(Project, pk=project_id, owner=request.user)
+    ws_flags = {
+        'ws1': project.stakeholders.exists(),
+        'ws2': project.problems.exists(),
+        'ws3': project.indicators.filter(accepted=True).exists(),
+        'ws4': project.swot_items.exists(),
+    }
+    return render(request, 'workshops/workshop_list.html', {
+        'project': project,
+        'ws_flags': ws_flags,
+    })
 
-    return render(request, 'workshops/workshop_list.html', {'projects': projects})
 
 
 # -------------------------
