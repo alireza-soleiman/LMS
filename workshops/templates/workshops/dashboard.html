@@ -90,7 +90,7 @@
 
           <div class="d-flex justify-content-between">
             <a href="{% url 'project_overview' card.project.id %}" class="btn btn-outline-primary btn-sm">📝 Edit Overview</a>
-            <a href="{% url 'workshop_list' %}" class="btn btn-primary btn-sm">🚀 Continue to Workshops</a>
+            <a href="{% url 'workshop_list' card.project.id %}" class="btn btn-primary btn-sm">🚀 Continue to Workshops</a>
           </div>
         </div>
       </div>
