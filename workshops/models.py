@@ -11,6 +11,7 @@ class Project(models.Model):
 
     # 🧠 Store Workshop 0 Overview data (A1–D2 boxes)
     overview = models.JSONField(default=dict, blank=True)
+    objective_tree = models.JSONField(default=dict, blank=True)
 
     # 👥 Team information
     group_name = models.CharField(max_length=255, blank=True, null=True)
