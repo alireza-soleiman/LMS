@@ -562,7 +562,7 @@ def create_project_view(request):
             project.owner = request.user
             project.members = members
             project.save()
-            return redirect('project_overview', project_id=project.id)
+            return redirect('workshop_list', project_id=project.id)
     else:
         form = ProjectCreateForm()
 
