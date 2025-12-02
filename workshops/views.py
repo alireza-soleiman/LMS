@@ -208,6 +208,117 @@ def problem_tree_data(request, project_id):
 
 
 # -------------------------
+# Objective Tree Views (Workshop 2.3)
+# -------------------------
+from .models import Objective
+from .forms import ObjectiveForm
+
+@login_required
+def objective_tree_view(request, project_id):
+    """
+    Workshop 2.3 – Objective Tree (manual, like Problem Tree):
+    - Students manually add objectives (overall, impacts, means)
+    - D3 visualizes them in a split tree (impacts up, means down)
+    """
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+
+    if request.method == "POST":
+        form = ObjectiveForm(request.POST, project=project)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.project = project
+            obj.save()
+            return redirect("objective_tree", project_id=project.id)
+    else:
+        form = ObjectiveForm(project=project)
+
+    all_objectives = Objective.objects.filter(project=project).order_by(
+        "objective_type", "description"
+    )
+
+    return render(
+        request,
+        "workshops/objective_tree.html",
+        {
+            "project": project,
+            "form": form,
+            "all_objectives": all_objectives,
+        },
+    )
+
+
+@login_required
+def objective_tree_data(request, project_id):
+    """
+    API: return hierarchical objective tree JSON for D3,
+    mirroring the structure of problem_tree_data.
+
+    Root: SITUATION (desired situation) OR first top-level objective.
+    Children:
+      - objective_type == 'IMPACT'  -> go into 'effects' (upper branch)
+      - others (OBJECTIVE/SITUATION etc.) -> go into 'causes' (lower branch / means)
+    """
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    all_objs = Objective.objects.filter(project=project)
+
+    # Root: try SITUATION with no parent, or any parent-less objective
+    root = (
+        all_objs.filter(objective_type="SITUATION", parent__isnull=True).first()
+        or all_objs.filter(parent__isnull=True).first()
+    )
+
+    if not root:
+        return JsonResponse({"name": "No Overall Objective Defined", "no_root": True})
+
+    def get_children(parent_node):
+        children_data = {"causes": [], "effects": []}
+        child_objs = all_objs.filter(parent=parent_node)
+        for child in child_objs:
+            grand_children = get_children(child)
+            node_data = {
+                "name": child.description,
+                "id": child.id,
+                "type": child.objective_type,
+                "color": child.color,
+                "causes": grand_children["causes"],
+                "effects": grand_children["effects"],
+            }
+            # IMPACT → upper branch (effects)
+            if child.objective_type == "IMPACT":
+                children_data["effects"].append(node_data)
+            else:
+                # OBJECTIVE / SITUATION → lower branch (means)
+                children_data["causes"].append(node_data)
+        return children_data
+
+    root_children = get_children(root)
+
+    tree_data = {
+        "name": root.description,
+        "id": root.id,
+        "type": root.objective_type,
+        "color": root.color,
+        "causes": root_children["causes"],
+        "effects": root_children["effects"],
+    }
+
+    return JsonResponse(tree_data)
+
+
+@login_required
+@require_POST
+def delete_objective(request, objective_id):
+    """
+    Delete a single objective node (and its children via cascade).
+    """
+    obj = get_object_or_404(Objective, id=objective_id)
+    if obj.project.owner != request.user:
+        return HttpResponseBadRequest("Permission denied.")
+    project_id = obj.project.id
+    obj.delete()
+    return redirect("objective_tree", project_id=project_id)
+
+# -------------------------
 # Workshop List / Projects
 # -------------------------
 
