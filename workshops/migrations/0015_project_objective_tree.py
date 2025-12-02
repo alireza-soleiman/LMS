@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='project',
-            name='objective_tree',
+            name='objective_tree.html',
             field=models.JSONField(blank=True, default=dict),
         ),
     ]

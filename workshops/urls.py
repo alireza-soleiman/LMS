@@ -22,8 +22,10 @@ urlpatterns = [
     path("problem/delete/<int:problem_id>/", views.delete_problem, name="delete_problem"),
 
     # WORKSHOP 2.3 — objective Tree
-    path('project/<int:project_id>/objective-tree/', views.objective_tree_view, name='objective_tree'),
-    path('project/<int:project_id>/objective-tree/save/', views.save_objective_tree, name='save_objective_tree'),
+    # WORKSHOP 2.3 — Objective Tree
+    path("project/<int:project_id>/objective-tree/", views.objective_tree_view, name="objective_tree"),
+    path("project/<int:project_id>/objective-tree/data/",views.objective_tree_data,name="objective_tree_data"),
+    path("objective/delete/<int:objective_id>/",views.delete_objective,name="delete_objective"),
 
     # WORKSHOP 3.1 — Indicator Selection
     path("project/<int:project_id>/indicators/", views.indicator_selection_view, name="indicator_selection"),

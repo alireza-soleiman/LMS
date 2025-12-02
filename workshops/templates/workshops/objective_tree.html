@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Objective Tree for {{ project.title }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .page-container {
+            display: flex;
+            gap: 2em;
+            margin: 2em;
+            padding: 1em;
+        }
+
+        .main-content {
+            flex: 3;
+        }
+        .sidebar {
+            flex: 2;
+            max-width: 400px;
+        }
+
+        /* === D3.js Tree Styles (mirroring Problem Tree) === */
+
+        .tree-container {
+            position: relative; /* anchor for the arrow */
+        }
+
+        .tree-container .card-body {
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #d3-tree-svg {
+            width: 100%;
+            min-height: 800px;
+            background-color: #fdfdfd;
+            padding-right: 50px;
+            box-sizing: border-box;
+        }
+
+        .how-arrow {
+            position: absolute;
+            right: 15px;
+            top: 10%;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #16a34a;
+            z-index: 10;
+        }
+        .how-arrow span {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            margin-bottom: 10px;
+        }
+        .how-arrow .arrow-line {
+            width: 4px;
+            background-color: #16a34a;
+            flex-grow: 1;
+        }
+        .how-arrow .arrow-head {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #16a34a;
+        }
+
+        .link {
+            fill: none;
+            stroke: #555;
+            stroke-opacity: 0.6;
+            stroke-width: 1.5px;
+        }
+
+        .node rect {
+            stroke: #333;
+            stroke-width: 1.5px;
+            stroke-opacity: 0.8;
+        }
+        .node.type-SITUATION rect { fill: #a5b4fc; } /* central desired situation */
+        .node.type-IMPACT rect    { fill: #bbf7d0; } /* upper branch */
+        .node.type-OBJECTIVE rect { fill: #e0f2fe; } /* lower branch */
+        .node.type-CUSTOM rect {
+            stroke: #000;
+            stroke-width: 2px;
+        }
+
+        .d3-tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 8px 12px;
+            font: 12px sans-serif;
+            background: #222;
+            color: #fff;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="page-container">
+
+    <div class="main-content">
+        <h1>Objective Tree: {{ project.title }}</h1>
+        <p class="text-muted">
+            Mirror of your Problem Tree: the <strong>central objective</strong> in the middle,
+            <strong>impacts</strong> above, and <strong>means / operational objectives</strong> below.
+        </p>
+
+        <div id="tree-to-download" class="tree-container card shadow-sm mb-4">
+            <div class="card-body">
+                <svg id="d3-tree-svg"></svg>
+            </div>
+
+            <div class="how-arrow">
+                <div class="arrow-head"></div>
+                <div class="arrow-line"></div>
+                <span>HOW?</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <!-- Add Objective Form -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Add New Objective</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-primary w-100 mt-3">
+                        Add to Objective Tree
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Actions</h2>
+            </div>
+            <div class="card-body d-grid gap-2">
+                <button type="button" onclick="downloadTreeAsPNG()" class="btn btn-outline-secondary">
+                    Download Objective Tree as PNG
+                </button>
+                <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
+                    ← Back to Workshops
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d3-tooltip"></div>
+
+<!-- Modal for node actions -->
+<div class="modal fade" id="nodeActionModal" tabindex="-1" aria-labelledby="nodeActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="nodeActionModalLabel">Objective Actions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>What would you like to do with this objective?</p>
+                <h6 id="modalNodeName"
+                    class="fw-bold text-dark border p-2 rounded bg-light"></h6>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <form id="modalDeleteForm" method="post" class="d-inline"
+                      onsubmit="return confirm('Are you sure you want to delete this objective? Children will also be removed.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete This Objective</button>
+                </form>
+                <button type="button" class="btn btn-primary" id="modalEditButton">
+                    Edit (coming soon)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const dataUrl = "{% url 'objective_tree_data' project.id %}";
+    const deleteUrlTemplate = "{% url 'delete_objective' 999 %}";
+    const nodeActionModal = new bootstrap.Modal(document.getElementById('nodeActionModal'));
+
+    const svg = d3.select("#d3-tree-svg");
+    const width = svg.node().getBoundingClientRect().width;
+    const g = svg.append("g");
+
+    const nodeWidth = 160;
+    const nodeHeight = 70;
+    const halfNodeHeight = nodeHeight / 2;
+
+    const tooltip = d3.select(".d3-tooltip");
+
+    const treeLayout = d3.tree()
+        .nodeSize([nodeWidth + 20, nodeHeight + 80]);
+
+    const linkGenerator = d3.linkVertical()
+        .x(d => d.x)
+        .y(d => d.y);
+
+    d3.json(dataUrl).then(function(data) {
+
+        if (!data || data.no_root) {
+            let message = data && data.no_root ?
+                "Please add an Overall Objective (SITUATION) to start building the tree." :
+                "No objectives added yet. Add one in the sidebar!";
+            svg.attr("height", 600);
+            g.append("text")
+                .attr("x", width / 2)
+                .attr("y", 300)
+                .attr("text-anchor", "middle")
+                .text(message);
+            return;
+        }
+
+        const causeHierarchy = d3.hierarchy(data, d => d.causes);
+        const effectHierarchy = d3.hierarchy(data, d => d.effects);
+
+        const causeTree = treeLayout(causeHierarchy);
+        const effectTree = treeLayout(effectHierarchy);
+
+        let maxEffectY = 0;
+        effectTree.descendants().forEach(d => {
+            if (d.y > maxEffectY) maxEffectY = d.y;
+        });
+
+        let maxCauseY = 0;
+        causeTree.descendants().forEach(d => {
+            if (d.y > maxCauseY) maxCauseY = d.y;
+        });
+
+        const totalTreeHeight = maxEffectY + maxCauseY + nodeHeight + 100;
+        const minHeight = 600;
+        svg.attr("height", Math.max(totalTreeHeight, minHeight));
+
+        const initialXOffset = width / 2;
+        const initialYOffset = maxEffectY + halfNodeHeight + 50;
+
+        g.attr("transform", `translate(${initialXOffset}, ${initialYOffset})`);
+
+        function drawTree(nodes, links, yDirection) {
+            g.append("g")
+                .attr("class", "links")
+                .selectAll("path")
+                .data(links)
+                .join("path")
+                .attr("class", "link")
+                .attr("d", d => linkGenerator({
+                    source: {
+                        x: d.source.x,
+                        y: (d.source.y * yDirection) + (halfNodeHeight * yDirection)
+                    },
+                    target: {
+                        x: d.target.x,
+                        y: (d.target.y * yDirection) - (halfNodeHeight * yDirection)
+                    }
+                }));
+
+            const node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .attr("class", d => `node type-${d.data.type} ${d.data.color ? 'type-CUSTOM' : ''}`)
+                .attr("transform", d => `translate(${d.x}, ${d.y * yDirection})`)
+                .style("cursor", d => d.data.id ? "pointer" : "default")
+                .on("click", (event, d) => {
+                    if (d.data.id) {
+                        const nodeId = d.data.id;
+                        const deleteUrl = deleteUrlTemplate.replace('999', nodeId);
+                        document.getElementById('modalNodeName').textContent = d.data.name;
+                        document.getElementById('modalDeleteForm').action = deleteUrl;
+                        document.getElementById('modalEditButton').onclick = () => {
+                            alert("Edit functionality will be added later.");
+                            nodeActionModal.hide();
+                        };
+                        nodeActionModal.show();
+                    }
+                })
+                .on("mouseover", (event, d) => {
+                    if (d.data.id) {
+                        tooltip.transition().style("opacity", .9);
+                        tooltip.html(
+                            `<strong>${d.data.type}</strong><hr style="margin:2px 0;opacity:0.3;">${d.data.name}`
+                        )
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                    }
+                })
+                .on("mouseout", () => {
+                    tooltip.transition().style("opacity", 0);
+                });
+
+            node.append("rect")
+                .attr("width", nodeWidth)
+                .attr("height", nodeHeight)
+                .attr("x", -nodeWidth / 2)
+                .attr("y", -nodeHeight / 2)
+                .attr("rx", 5)
+                .attr("ry", 5)
+                .style("fill", d => d.data.color ? d.data.color : null);
+
+            node.append("foreignObject")
+                .attr("width", nodeWidth - 10)
+                .attr("height", nodeHeight - 10)
+                .attr("x", -nodeWidth / 2 + 5)
+                .attr("y", -nodeHeight / 2 + 5)
+                .append("xhtml:div")
+                .style("width", "100%")
+                .style("height", "100%")
+                .style("display", "flex")
+                .style("align-items", "center")
+                .style("justify-content", "center")
+                .style("text-align", "center")
+                .style("font-size", "13px")
+                .style("color", "#111827")
+                .style("font-weight", "600")
+                .style("overflow-wrap", "break-word")
+                .html(d => d.data.name);
+        }
+
+        drawTree(causeTree.descendants(), causeTree.links(), 1);
+        drawTree(effectTree.descendants().slice(1), effectTree.links(), -1);
+    });
+
+    function downloadTreeAsPNG() {
+        const treeContainer = document.getElementById("tree-to-download");
+        html2canvas(treeContainer, {
+            scale: 2
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'objective-tree.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    }
+</script>
+
+</body>
+</html>

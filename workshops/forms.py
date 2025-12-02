@@ -29,28 +29,35 @@ class ProblemForm(forms.ModelForm):
         widgets = {
             'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
         }
-
 class ObjectiveForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        project = kwargs.pop('project', None)
-        super(ObjectiveForm, self).__init__(*args, **kwargs)
-        if project:
-            # The parent dropdown should only show desired situations or other objectives
-            self.fields['parent'].queryset = Objective.objects.filter(project=project).exclude(objective_type='IMPACT')
-        self.fields['parent'].required = False
+    parent = forms.ModelChoiceField(
+        queryset=Objective.objects.none(),
+        required=False,
+        label="Parent objective",
+        help_text="Optional: choose the objective this one depends on.",
+    )
 
     class Meta:
         model = Objective
-        fields = ['description', 'objective_type', 'parent', 'color']
-        labels = {
-            'parent': 'Which objective does this relate to?',
-            'objective_type': 'Objective Type',
-            'color': 'Node Color (Optional)',
-        }
+        fields = ["description", "objective_type", "parent", "color"]
         widgets = {
-            'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
+            "description": forms.Textarea(attrs={
+                "rows": 3,
+                "class": "form-control",
+                "placeholder": "Write the objective…"
+            }),
+            "objective_type": forms.Select(attrs={"class": "form-select"}),
+            "color": forms.TextInput(attrs={
+                "type": "color",
+                "class": "form-control form-control-color"
+            }),
         }
 
+    def __init__(self, *args, **kwargs):
+        project = kwargs.pop("project", None)
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            self.fields["parent"].queryset = Objective.objects.filter(project=project)
 # workshops/forms.py  (add near other forms)
 
 from django.core.exceptions import ValidationError
