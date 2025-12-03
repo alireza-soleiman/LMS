@@ -71,6 +71,65 @@
 
 <!-- 🎨 Styles -->
 <style>
+/* ===== SRF TABLE BEAUTIFUL UI ===== */
+.srf-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.srf-table thead th {
+  background: #f6f8fa;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 10px;
+  border-bottom: 1px solid #d0d7de !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.srf-table tbody td {
+  padding: 10px !important;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.srf-table tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+/* Editable cells styling */
+.srf-editable {
+  background: #fffceb;
+  border: 1px solid #e6d784;
+  border-radius: 4px;
+  min-width: 80px;
+  cursor: text;
+}
+
+/* Wider indicator column */
+.srf-col-indicator {
+  width: 45%;
+  line-height: 1.35;
+}
+
+/* Rank column */
+.srf-rank {
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Total column highlighted */
+.srf-total {
+  background: #edf7ff;
+  border: 1px solid #b5daff;
+}
+
 /* === Diagonal board layout === */
 #board {
   min-height: 600px;
@@ -372,11 +431,11 @@ board.addEventListener("click", e => {
 </script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const saveBtn = document.getElementById("saveBtn");
-  const summary = document.getElementById("summaryTable");
-  const board = document.getElementById("board");
+  const saveBtn   = document.getElementById("saveBtn");
+  const summaryEl = document.getElementById("summaryTable");
+  const board     = document.getElementById("board");
 
-  // 🔍 Gather order + groups from the visual board
+  // 🔍 Read the visual order from the board (same as before)
   function getRankingData() {
     const items = [...board.children];
     const order = [];
@@ -384,7 +443,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     items.forEach(el => {
       if (el.classList.contains("white-card")) {
-        order.push("gap");
+        order.push("gap");   // we still send gaps for the backend if needed
       } else if (el.classList.contains("group-card")) {
         const groupIds = [...el.querySelectorAll(".srf-card")].map(c => c.dataset.id);
         order.push(...groupIds);
@@ -398,76 +457,60 @@ document.addEventListener("DOMContentLoaded", () => {
     return { order, groups };
   }
 
- // 📊 Compute SRF-style weights (Top = Most Important)
-// Handles "gap" (white cards) and equal-importance groups
-function computeWeights(order, groups) {
-  // Determine positions, ignoring white cards
-  const cleanOrder = order.filter(item => item !== "gap");
-  if (cleanOrder.length === 0) return {};
-
-  let baseScore = cleanOrder.length; // Top card = highest score
-  const scores = {};
-  const visited = new Set();
-
-  // We loop top → bottom so white cards below reduce importance
-  for (let i = 0; i < order.length; i++) {
-    const item = order[i];
-
-    if (item === "gap") {
-      baseScore -= 1; // Gaps increase the step difference
-      continue;
-    }
-
-    // Find the group that contains this indicator (if any)
-    const group = groups.find(g => g.includes(item));
-    if (group && !visited.has(group)) {
-      visited.add(group);
-      // Assign the same score to all indicators in this group
-      group.forEach(id => {
-        scores[id] = baseScore;
-      });
-      baseScore -= 1; // next group below gets lower importance
-    } else if (!group) {
-      scores[item] = baseScore;
-      baseScore -= 1;
-    }
+  // 🧮 Build an EMPTY Excel-style SRF table in the *ranking order only*
+  function renderEmptySrfTable(rankedIds) {
+  if (!rankedIds.length) {
+    summaryEl.innerHTML = `
+      <p class="text-muted small mb-0">
+        No indicators detected. Arrange cards on the board and save again.
+      </p>`;
+    return;
   }
 
-  // Normalize to 1.0 total
-  const total = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
-  const weights = {};
-  for (const [id, sc] of Object.entries(scores)) {
-    weights[id] = (sc / total).toFixed(4);
-  }
+  const rows = rankedIds.map((id, idx) => {
+    const card = document.querySelector(`.srf-card[data-id="${id}"]`);
+    const name = card ? card.querySelector("h6").innerText : `Indicator ${id}`;
 
-  return weights;
+    return `
+      <tr data-id="${id}">
+        <td class="srf-rank">${idx + 1}</td>
+        <td class="srf-col-indicator">${name}</td>
+        <td><div class="srf-editable" contenteditable="true"></div></td>
+        <td><div class="srf-editable" contenteditable="true"></div></td>
+        <td><div class="srf-editable" contenteditable="true"></div></td>
+        <td><div class="srf-editable" contenteditable="true"></div></td>
+        <td><div class="srf-editable srf-total" contenteditable="true"></div></td>
+      </tr>`;
+  }).join("");
+
+  summaryEl.innerHTML = `
+    <h5 class="mt-3 mb-2">💡 SRF Weight Summary</h5>
+    <h6 class="text-muted mb-3">📊 Computed SRF Weights (Ranking Only)</h6>
+
+    <table class="srf-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Indicator</th>
+          <th>Number of cards</th>
+          <th>Card positions</th>
+          <th>Sum of positions</th>
+          <th>Normalized weight</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <p class="text-muted mt-3 small">
+      The <strong>visual ranking</strong> defines ordering automatically.<br>
+      All other fields remain <strong>empty</strong> and should be filled manually,
+      following the Excel sheet logic.
+    </p>
+  `;
 }
 
-  // 🧾 Render results in the summary table
-  function renderSummary(weights) {
-    const rows = Object.entries(weights)
-      .map(([id, w]) => {
-        const card = document.querySelector(`.srf-card[data-id="${id}"]`);
-        const name = card ? card.querySelector("h6").innerText : `Indicator ${id}`;
-        return `<tr><td>${name}</td><td>${w}</td></tr>`;
-      })
-      .join("");
-
-    summary.innerHTML = `
-      <h6 class="mb-2">📊 Computed SRF Weights</h6>
-      <table class="table table-sm table-bordered">
-        <thead class="table-light">
-          <tr><th>Indicator</th><th>Weight</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <p class="text-muted small mt-2">
-        Total = 1.0000 (normalized). Higher weight → higher importance.
-      </p>
-    `;
-  }
-
-  // 💾 Save & compute weights
+  // 💾 Save ranking + show empty table
   saveBtn.addEventListener("click", () => {
     const { order, groups } = getRankingData();
 
@@ -476,9 +519,21 @@ function computeWeights(order, groups) {
       return;
     }
 
-    const weights = computeWeights(order, groups);
-    renderSummary(weights);
+    // Only keep actual indicators, in current visual order (ignore "gap")
+    const rankedIds = [];
+    const seen = new Set();
+    for (const item of order) {
+      if (item === "gap") continue;
+      if (!seen.has(item)) {
+        seen.add(item);
+        rankedIds.push(item);
+      }
+    }
 
+    // 🧩 Build Excel-style table with ONLY ranking auto-filled
+    renderEmptySrfTable(rankedIds);
+
+    // 🔐 Still send full order + groups to backend (no weights)
     fetch("{% url 'indicator_ranking_view' project.id %}", {
       method: "POST",
       headers: {
@@ -490,9 +545,9 @@ function computeWeights(order, groups) {
       .then(res => res.json())
       .then(data => {
         if (data.status === "success") {
-          alert("✅ SRF weights calculated and saved successfully!");
+          alert("✅ Ranking saved successfully! Fill the SRF table manually following the Excel sheet.");
         } else {
-          alert("⚠️ Error saving weights: " + (data.message || "Unknown issue"));
+          alert("⚠️ Error saving ranking: " + (data.message || "Unknown issue"));
           console.error(data);
         }
       })
@@ -503,5 +558,6 @@ function computeWeights(order, groups) {
   });
 });
 </script>
+
 
 {% endblock %}
