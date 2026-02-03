@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
+  <p class="text-muted mb-4">
+    <strong>Stage 2 – Q-Sorting Simulation:</strong>
+    Choose a role and sort the actions into the forced distribution grid from -3 (most disagree) to +3 (most agree).
+  </p>
+
+  <div class="card mb-3">
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Participant label</label>
+        <input id="participant_label" type="text" class="form-control" placeholder="e.g. Citizen 1">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Role</label>
+        <input id="role" type="text" class="form-control" placeholder="e.g. Citizen, Public Administration, Expert">
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    {% if qsorts %}
+<div class="card mb-3">
+  <div class="card-header">
+    Saved Q-Sorts
+  </div>
+  <div class="card-body">
+    {% for s in qsorts %}
+      <div class="border rounded p-2 mb-2 bg-light">
+        <strong>{{ s.participant_label }}</strong>
+        <span class="text-muted">(Role: {{ s.role }})</span><br>
+        <small class="text-muted">Saved at: {{ s.created_at }}</small>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+    <div class="card-header">
+      Unsorted Actions
+    </div>
+    <div class="card-body">
+      <div id="unsorted" class="row g-2">
+        {% for action in actions %}
+          <div class="col-md-4">
+            <div class="card q-card mb-2" data-action-id="{{ action.id }}">
+              <div class="card-body p-2">
+                <small>{{ action.text }}</small>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <small class="text-muted">Drag each card into the grid below.</small>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      Forced Distribution Grid (from -3: most disagree to +3: most agree)
+    </div>
+    <div class="card-body">
+      <div class="row text-center mb-2">
+        <div class="col">-3</div>
+        <div class="col">-2</div>
+        <div class="col">-1</div>
+        <div class="col">0</div>
+        <div class="col">+1</div>
+        <div class="col">+2</div>
+        <div class="col">+3</div>
+      </div>
+
+      <!-- Simple pyramid capacity example: 2–3–4–5–4–3–2 (adapt as you like) -->
+            <!-- Simple pyramid capacity example: 2–3–4–5–4–3–2 (adapt as you like) -->
+      <div class="row">
+        {% for score in score_levels %}
+          <div class="col">
+            <div class="q-bucket border p-2 mb-1"
+                 data-score="{{ score }}"
+                 data-capacity="{% if score == '-3' or score == '3' %}2
+                                {% elif score == '-2' or score == '2' %}3
+                                {% elif score == '-1' or score == '1' %}4
+                                {% else %}5
+                                {% endif %}">
+            </div>
+            <small class="text-muted">
+              Max:
+              {% if score == '-3' or score == '3' %}2
+              {% elif score == '-2' or score == '2' %}3
+              {% elif score == '-1' or score == '1' %}4
+              {% else %}5
+              {% endif %}
+            </small>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{% url 'scenario_building' project.id %}" class="btn btn-outline-secondary">
+      ← Back to Actions
+    </a>
+    <div>
+      <button id="save-qsort" type="button" class="btn btn-primary">
+        Save Q-Sort
+      </button>
+      <a href="{% url 'scenario_results' project.id %}" class="btn btn-success ms-2">
+        View Scenarios →
+      </a>
+    </div>
+  </div>
+
+  <div id="qsort-feedback" class="text-success d-none">
+    Q-sort saved successfully.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+  const csrftoken = '{{ csrf_token }}';
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Make unsorted draggable (multi-column)
+    const unsortedContainer = document.getElementById('unsorted');
+    Sortable.create(unsortedContainer, {
+      group: 'qgroup',
+      animation: 150,
+      handle: '.q-card',
+      draggable: '.col-md-4'
+    });
+
+    // Buckets
+    document.querySelectorAll('.q-bucket').forEach(bucket => {
+      Sortable.create(bucket, {
+        group: 'qgroup',
+        animation: 150,
+        onAdd: function (evt) {
+          const capacity = parseInt(bucket.dataset.capacity || '99', 10);
+          if (bucket.children.length > capacity) {
+            // Reject if over capacity: move back to unsorted
+            const item = evt.item;
+            unsortedContainer.appendChild(item.closest('.col-md-4') || item);
+            alert('This column is full. Please move some cards elsewhere.');
+          }
+        }
+      });
+    });
+
+    document.getElementById('save-qsort').addEventListener('click', function () {
+      const participant_label = document.getElementById('participant_label').value.trim();
+      const role = document.getElementById('role').value.trim();
+
+      const distribution = {};
+      document.querySelectorAll('.q-bucket').forEach(bucket => {
+        const score = bucket.dataset.score;
+        const ids = [];
+        bucket.querySelectorAll('.q-card').forEach(card => {
+          ids.push(card.dataset.actionId);
+        });
+        distribution[score] = ids;
+      });
+
+      const formData = new FormData();
+      formData.append('mode', 'qsort');
+      formData.append('participant_label', participant_label);
+      formData.append('role', role);
+      formData.append('distribution_json', JSON.stringify(distribution));
+
+      fetch("{% url 'save_scenario' project.id %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrftoken},
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+
+    // Show success
+    const fb = document.getElementById('qsort-feedback');
+    fb.classList.remove('d-none');
+
+    // 1️⃣ Reset all cards back to UNSORTED
+    const unsortedRow = document.getElementById('unsorted');
+    const allCards = document.querySelectorAll('.q-card');
+    allCards.forEach(card => {
+        const wrapper = card.closest('.col-md-4');
+        unsortedRow.appendChild(wrapper);
+    });
+
+    // 2️⃣ Clear participant label + role inputs
+    document.getElementById('participant_label').value = '';
+    document.getElementById('role').value = '';
+
+    // 3️⃣ Reload saved Q-sorts by refreshing part of the page
+    location.reload();
+
+    setTimeout(() => fb.classList.add('d-none'), 2500);
+})
+      .catch(err => {
+        console.error(err);
+        alert('Error saving Q-sort.');
+      });
+    });
+  });
+</script>
+{% endblock %}

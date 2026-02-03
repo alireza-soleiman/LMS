@@ -1,5 +1,7 @@
 # workshops/views.py
 from collections import OrderedDict
+import math
+from datetime import datetime
 import csv
 import json
 import re
@@ -715,3 +717,298 @@ def project_overview_view(request, project_id):
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
     return render(request, "workshops/project_overview.html", {"project": project, "overview": project.overview})
+
+
+
+def get_scenario_data(project: Project) -> dict:
+    data = project.scenario_data or {}
+    data.setdefault("actions", [])
+    data.setdefault("qsorts", [])
+    data.setdefault("scenarios", [])
+    return data
+
+
+def save_scenario_data(project: Project, data: dict) -> None:
+    project.scenario_data = data
+    project.save(update_fields=["scenario_data"])
+
+@login_required
+def scenario_building_view(request, project_id):
+    """Stage 1 – Development of Research Instrument (actions CRUD)."""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    data = get_scenario_data(project)
+    actions = data["actions"]
+
+    # Simple auto-id for actions
+    next_id = max([a["id"] for a in actions], default=0) + 1
+
+    if request.method == "POST":
+        # Non-AJAX form fallback (optional)
+        texts = request.POST.getlist("action_text[]")
+        new_actions = []
+        _id = 1
+        for t in texts:
+            t = t.strip()
+            if not t:
+                continue
+            new_actions.append({
+                "id": _id,
+                "text": t,
+                "created_at": datetime.utcnow().isoformat()
+            })
+            _id += 1
+        data["actions"] = new_actions
+        save_scenario_data(project, data)
+        return redirect("scenario_building", project_id=project.id)
+
+    return render(
+        request,
+        "workshops/scenario_actions.html",
+        {
+            "project": project,
+            "actions": actions,
+        },
+    )
+
+@login_required
+def scenario_qsort_view(request, project_id):
+    """Stage 2 – Q-Sorting Simulation."""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    data = get_scenario_data(project)
+    actions = data["actions"]
+
+    if not actions:
+        # If no actions yet, redirect back to stage 1
+        return redirect("scenario_building", project_id=project.id)
+
+    # 👇 this list will be used in the template instead of ".split()"
+    score_levels = ["-3", "-2", "-1", "0", "1", "2", "3"]
+
+    return render(
+        request,
+        "workshops/scenario_qsort.html",
+        {
+            "project": project,
+            "actions": actions,
+            "score_levels": score_levels,
+            "qsorts": data.get("qsorts", []),
+        },
+    )
+
+def _vector_from_qsort(distribution, action_ids):
+    """Convert a distribution dict into a vector aligned with action_ids."""
+    score_by_action = {aid: 0 for aid in action_ids}
+    for score_str, ids in distribution.items():
+        try:
+            score = int(score_str)
+        except ValueError:
+            continue
+        for aid in ids:
+            score_by_action[int(aid)] = score
+    return [score_by_action[aid] for aid in action_ids]
+
+
+def _euclidean_distance(a, b):
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
+def _kmeans(qsort_vectors, k=3, max_iter=25):
+    """Very simple k-means implementation."""
+    n = len(qsort_vectors)
+    if n == 0:
+        return []
+
+    k = min(k, n)
+    centroids = qsort_vectors[:k]  # initial centroids
+    assignments = [0] * n
+
+    for _ in range(max_iter):
+        # Assignment step
+        changed = False
+        for i, vec in enumerate(qsort_vectors):
+            dists = [_euclidean_distance(vec, c) for c in centroids]
+            new_cluster = dists.index(min(dists))
+            if new_cluster != assignments[i]:
+                assignments[i] = new_cluster
+                changed = True
+
+        if not changed:
+            break
+
+        # Update step
+        new_centroids = []
+        for cluster_idx in range(k):
+            members = [qsort_vectors[i] for i in range(n) if assignments[i] == cluster_idx]
+            if not members:
+                new_centroids.append(centroids[cluster_idx])
+            else:
+                dim = len(members[0])
+                avg = [
+                    sum(vec[d] for vec in members) / len(members)
+                    for d in range(dim)
+                ]
+                new_centroids.append(avg)
+        centroids = new_centroids
+
+    return assignments
+
+
+def run_scenario_extraction(data):
+    actions = data.get("actions", [])
+    qsorts = data.get("qsorts", [])
+    if not actions or not qsorts:
+        data["scenarios"] = []
+        return data
+
+    action_ids = [a["id"] for a in actions]
+
+    # Build vectors
+    vectors = []
+    for qs in qsorts:
+        dist = qs.get("distribution", {})
+        vec = _vector_from_qsort(dist, action_ids)
+        vectors.append(vec)
+
+    # Cluster into 3 scenarios
+    assignments = _kmeans(vectors, k=3)
+
+    # Group qsort indices by cluster
+    clusters = {}
+    for idx, cluster_id in enumerate(assignments):
+        clusters.setdefault(cluster_id, []).append(idx)
+
+    scenarios = []
+    scenario_counter = 1
+
+    for cluster_id, q_indices in clusters.items():
+        if not q_indices:
+            continue
+
+        # Compute composite score per action (average across qsorts in this cluster)
+        composite = {aid: 0.0 for aid in action_ids}
+        for aid_idx, aid in enumerate(action_ids):
+            scores = [vectors[i][aid_idx] for i in q_indices]
+            composite[aid] = sum(scores) / len(scores)
+
+        # Sort actions by composite score descending
+        sorted_actions = sorted(action_ids, key=lambda aid: composite[aid], reverse=True)
+        top_actions_ids = sorted_actions[:3]
+        top_actions_texts = [
+            next(a["text"] for a in actions if a["id"] == tid)
+            for tid in top_actions_ids
+        ]
+
+        # Title + description suggestion
+        main_action = top_actions_texts[0] if top_actions_texts else "Key action"
+        title = f"Scenario {scenario_counter}: {main_action[:60]}"
+
+        description_parts = [
+            "This scenario groups participants who strongly support:",
+        ]
+        for t in top_actions_texts:
+            description_parts.append(f"• {t}")
+        description = "\n".join(description_parts)
+
+        scenarios.append({
+            "id": scenario_counter,
+            "title": title,
+            "description": description,
+            "top_actions": top_actions_ids,
+            "composite_scores": composite,
+        })
+
+        scenario_counter += 1
+
+    data["scenarios"] = scenarios
+    data["last_clustered_at"] = datetime.utcnow().isoformat()
+    return data
+
+
+@login_required
+def scenario_results_view(request, project_id):
+    """Stage 3–4 – Show scenarios + allow recalculation + PDF export."""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    data = get_scenario_data(project)
+
+    if request.method == "POST":
+        # Trigger clustering
+        data = run_scenario_extraction(data)
+        save_scenario_data(project, data)
+        return redirect("scenario_results", project_id=project.id)
+
+    actions = data.get("actions", [])
+    scenarios = data.get("scenarios", [])
+
+    # Make a quick lookup for actions by id for template use
+    action_by_id = {a["id"]: a for a in actions}
+
+    return render(
+        request,
+        "workshops/scenario_results.html",
+        {
+            "project": project,
+            "scenarios": scenarios,
+            "actions": actions,
+            "action_by_id": action_by_id,
+        },
+    )
+
+
+@require_POST
+@login_required
+def save_scenario(request, project_id):
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    data = get_scenario_data(project)
+
+    mode = request.POST.get("mode")
+    if mode == "actions":
+        # expects 'actions_json' = JSON list of {id?, text}
+        try:
+            actions_json = request.POST.get("actions_json", "[]")
+            incoming = json.loads(actions_json)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON")
+
+        new_actions = []
+        next_id = 1
+        for item in incoming:
+            text = (item.get("text") or "").strip()
+            if not text:
+                continue
+            new_actions.append({
+                "id": next_id,
+                "text": text,
+                "created_at": datetime.utcnow().isoformat()
+            })
+            next_id += 1
+
+        data["actions"] = new_actions
+        save_scenario_data(project, data)
+        return JsonResponse({"status": "ok", "actions": new_actions})
+
+    elif mode == "qsort":
+        # expects: participant_label, role, distribution_json
+        participant_label = (request.POST.get("participant_label") or "").strip()
+        role = (request.POST.get("role") or "").strip()
+        try:
+            dist_json = request.POST.get("distribution_json", "{}")
+            distribution = json.loads(dist_json)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON")
+
+        qsorts = data.get("qsorts", [])
+        next_id = max([q["id"] for q in qsorts], default=0) + 1
+
+        qsorts.append({
+            "id": next_id,
+            "participant_label": participant_label or f"Participant {next_id}",
+            "role": role or "Unspecified",
+            "created_at": datetime.utcnow().isoformat(),
+            "distribution": distribution,
+        })
+        data["qsorts"] = qsorts
+        save_scenario_data(project, data)
+        return JsonResponse({"status": "ok", "qsort_id": next_id})
+
+    else:
+        return HttpResponseBadRequest("Unknown mode")

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load dict_utils %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
+  <p class="text-muted mb-4">
+    <strong>Stage 3–4 – Scenario Extraction & Reporting:</strong>
+    The Q-sorts are clustered into 3 scenarios. Review, interpret, and export a PDF summary.
+  </p>
+
+  <div class="d-flex justify-content-between mb-3">
+    <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
+      ← Back to Q-Sorting
+    </a>
+
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        Recalculate Scenarios
+      </button>
+    </form>
+  </div>
+
+  {% if not scenarios %}
+    <div class="alert alert-info">
+      No scenarios generated yet. Please make sure you have defined actions and at least one Q-sort,
+      then click <strong>Recalculate Scenarios</strong>.
+    </div>
+
+  {% else %}
+    <div id="scenarios-container" class="row g-3">
+
+      {% for scenario in scenarios %}
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="card-header">
+            {{ scenario.title }}
+          </div>
+
+          <div class="card-body">
+            <p class="small white-space-pre-line">{{ scenario.description }}</p>
+
+            <!-- TOP 3 ACTIONS -->
+            <h6>Top 3 preferred actions</h6>
+            <ol class="small">
+              {% for aid in scenario.top_actions %}
+                {% with action=action_by_id|dict_get:aid %}
+                  {% if action %}
+                    <li>{{ action.text }}</li>
+                  {% endif %}
+                {% endwith %}
+              {% endfor %}
+            </ol>
+
+            <!-- FULL RANKING -->
+            <h6 class="mt-3">Full ranking (composite scores)</h6>
+            <table class="table table-sm table-bordered small">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th class="text-end">Score</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for aid, score in scenario.composite_scores.items|dictsortreversed:"1" %}
+                  {% with action=action_by_id|dict_get:aid %}
+                    <tr>
+                      <td>{{ action.text }}</td>
+                      <td class="text-end">{{ score|floatformat:2 }}</td>
+                    </tr>
+                  {% endwith %}
+                {% endfor %}
+              </tbody>
+            </table>
+
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+
+    <div class="mt-4">
+      <button id="download-pdf" class="btn btn-success">
+        Download PDF Summary
+      </button>
+    </div>
+
+  {% endif %}
+</div>
+
+<!-- PDF EXPORT SCRIPT -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+        integrity="sha512-v2kKQf9yDgLwJ2p4lCyLuXyqkdwC3Jd0QYQH+0vO/0kntv5TbqOk0zGvjS5LJ9chrr69WvYk5fqPNPz7DgXnXw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.getElementById('download-pdf');
+  if (!btn) return;
+
+  btn.addEventListener('click', function () {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let y = 10;
+    doc.setFontSize(14);
+    doc.text('Workshop 5 – Scenario Building Summary', 10, y);
+    y += 8;
+
+    const cards = document.querySelectorAll('#scenarios-container .card');
+    doc.setFontSize(11);
+
+    cards.forEach((card) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 10;
+      }
+
+      const title = card.querySelector('.card-header').innerText.trim();
+      doc.text(title, 10, y);
+      y += 6;
+
+      const desc = card.querySelector('.card-body p').innerText.trim();
+      const descLines = doc.splitTextToSize(desc, 180);
+      doc.text(descLines, 10, y);
+      y += 6 + (descLines.length - 1) * 6;
+
+      const topList = card.querySelectorAll('ol li');
+      doc.text('Top 3 preferred actions:', 10, y);
+      y += 6;
+
+      topList.forEach(li => {
+        const text = '- ' + li.innerText.trim();
+        const lines = doc.splitTextToSize(text, 180);
+        doc.text(lines, 12, y);
+        y += 6 * lines.length;
+      });
+
+      y += 4;
+    });
+
+    doc.save('scenario_building_summary.pdf');
+  });
+});
+</script>
+
+{% endblock %}

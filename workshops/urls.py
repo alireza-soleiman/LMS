@@ -41,6 +41,12 @@ urlpatterns = [
     path("project/<int:project_id>/swot/", swot_analysis_view, name="swot_analysis"),
     path("project/<int:project_id>/swot/save/", save_swot_entry, name="save_swot_entry"),
 
+    # Workshop 5 — Scenario Building
+    path("project/<int:project_id>/scenario/", views.scenario_building_view, name="scenario_building"),
+    path("project/<int:project_id>/scenario/qsort/", views.scenario_qsort_view, name="scenario_qsort"),
+    path("project/<int:project_id>/scenario/results/", views.scenario_results_view, name="scenario_results"),
+    path("project/<int:project_id>/scenario/save/", views.save_scenario, name="save_scenario"),
+
     # Project Creation
     path("project/create/", views.create_project_view, name="create_project"),
 

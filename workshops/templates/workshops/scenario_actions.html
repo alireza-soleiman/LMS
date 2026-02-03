@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
+  <p class="text-muted mb-4">
+    <strong>Stage 1 – Development of Research Instrument:</strong>
+    Define 9–12 actions/statements that will be used for Q-sorting.
+  </p>
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Actions / Statements</span>
+      <small class="text-muted">Aim for 9–12 clear, distinct actions.</small>
+    </div>
+    <div class="card-body">
+      <ul id="actions-list" class="list-group mb-3">
+        {% for action in actions %}
+          <li class="list-group-item d-flex align-items-center">
+            <input type="text" class="form-control me-2 action-input" value="{{ action.text }}">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-action">
+              &times;
+            </button>
+          </li>
+        {% empty %}
+          <li class="list-group-item text-muted">
+            Start by adding your first action.
+          </li>
+        {% endfor %}
+      </ul>
+
+      <button id="add-action" type="button" class="btn btn-outline-primary mb-3">
+        + Add Action
+      </button>
+
+      <div class="d-flex justify-content-between">
+        <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary">
+          Back to Workshops
+        </a>
+        <div>
+          <button id="save-actions" type="button" class="btn btn-primary">
+            Save Actions
+          </button>
+          <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-success ms-2">
+            Next: Q-Sorting →
+          </a>
+        </div>
+      </div>
+
+      <div id="actions-feedback" class="mt-3 text-success d-none">
+        Actions saved successfully.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const csrftoken = '{{ csrf_token }}';
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const list = document.getElementById('actions-list');
+    const addBtn = document.getElementById('add-action');
+    const saveBtn = document.getElementById('save-actions');
+    const feedback = document.getElementById('actions-feedback');
+
+    function addActionRow(text = '') {
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex align-items-center';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-control me-2 action-input';
+      input.value = text;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline-danger btn-sm remove-action';
+      btn.innerHTML = '&times;';
+      btn.addEventListener('click', () => li.remove());
+
+      li.appendChild(input);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+
+    addBtn.addEventListener('click', () => {
+      addActionRow('');
+    });
+
+    list.querySelectorAll('.remove-action').forEach(btn => {
+      btn.addEventListener('click', function () {
+        this.closest('li').remove();
+      });
+    });
+
+    saveBtn.addEventListener('click', function () {
+      const inputs = list.querySelectorAll('.action-input');
+      const actions = [];
+      inputs.forEach(input => {
+        const text = input.value.trim();
+        if (text) {
+          actions.push({text: text});
+        }
+      });
+
+      const formData = new FormData();
+      formData.append('mode', 'actions');
+      formData.append('actions_json', JSON.stringify(actions));
+
+      fetch("{% url 'save_scenario' project.id %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrftoken},
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        feedback.classList.remove('d-none');
+        setTimeout(() => feedback.classList.add('d-none'), 2500);
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error saving actions.');
+      });
+    });
+  });
+</script>
+{% endblock %}
