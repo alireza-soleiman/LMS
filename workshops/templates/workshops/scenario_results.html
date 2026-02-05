@@ -83,6 +83,101 @@
 
     </div>
 
+    {% if analysis %}
+    <div class="mt-5">
+      <h4>Q-Methodology Analytics</h4>
+
+      {% if analysis.pearson_correlation %}
+      <div class="mt-3">
+        <h6>Pearson Correlation (Participants)</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small">
+            <thead>
+              <tr>
+                <th>Participant</th>
+                {% for label in analysis.pearson_correlation.labels %}
+                  <th class="text-end">{{ label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in analysis.pearson_correlation.matrix %}
+                <tr>
+                  <td>{{ analysis.pearson_correlation.labels|list_get:forloop.counter0 }}</td>
+                  {% for value in row %}
+                    <td class="text-end">{{ value|floatformat:3 }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if analysis.scenario_correlation %}
+      <div class="mt-3">
+        <h6>Correlation Between Scenarios</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small">
+            <thead>
+              <tr>
+                <th>Scenario</th>
+                {% for label in analysis.scenario_correlation.labels %}
+                  <th class="text-end">{{ label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in analysis.scenario_correlation.matrix %}
+                <tr>
+                  <td>{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
+                  {% for value in row %}
+                    <td class="text-end">{{ value|floatformat:3 }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if analysis.factor_analysis %}
+      <div class="mt-3">
+        <h6>Factor Loadings</h6>
+        <p class="small text-muted mb-2">
+          Eigenvalues: {{ analysis.factor_analysis.eigenvalues|join:", " }}.
+          Number of factors (Kaiser &gt; 1): {{ analysis.factor_analysis.n_factors }}.
+        </p>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered small">
+            <thead>
+              <tr>
+                <th>Participant</th>
+                {% for _ in analysis.factor_analysis.rotated_loadings|list_get:0 %}
+                  <th class="text-end">F{{ forloop.counter }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in analysis.factor_analysis.rotated_loadings %}
+                <tr>
+                  <td>{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
+                  {% for value in row %}
+                    <td class="text-end">{{ value|floatformat:3 }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <div class="mt-4">
       <button id="download-pdf" class="btn btn-success">
         Download PDF Summary

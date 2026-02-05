@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load dict_utils %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
+  <p class="text-muted mb-4">
+    <strong>Stage 3 – Correlation Analysis:</strong>
+    Review the Pearson correlation matrix between participants before proceeding to scenario results.
+  </p>
+
+  <div class="d-flex justify-content-between mb-3">
+    <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
+      ← Back to Q-Sorting
+    </a>
+
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">
+        Confirm &amp; Proceed
+      </button>
+    </form>
+  </div>
+
+  {% if empty %}
+    <div class="alert alert-info">
+      No participant Q-sorts found yet. Please save at least one Q-sort, then return here.
+    </div>
+  {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered small">
+        <thead>
+          <tr>
+            <th>Participant</th>
+            {% for label in labels %}
+              <th class="text-end">{{ label }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix %}
+            <tr>
+              <td>{{ labels|list_get:forloop.counter0 }}</td>
+              {% for value in row %}
+                <td class="text-end">{{ value|floatformat:3 }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

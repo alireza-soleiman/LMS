@@ -44,6 +44,7 @@ urlpatterns = [
     # Workshop 5 — Scenario Building
     path("project/<int:project_id>/scenario/", views.scenario_building_view, name="scenario_building"),
     path("project/<int:project_id>/scenario/qsort/", views.scenario_qsort_view, name="scenario_qsort"),
+    path("project/<int:project_id>/scenario/correlation/", views.correlation_matrix_view, name="scenario_correlation"),
     path("project/<int:project_id>/scenario/results/", views.scenario_results_view, name="scenario_results"),
     path("project/<int:project_id>/scenario/save/", views.save_scenario, name="save_scenario"),
 

@@ -168,6 +168,18 @@ class IndicatorRanking(models.Model):
         ordering = ['position']
 
 
+class QSortResult(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="qsort_results")
+    participant_id = models.CharField(max_length=64)
+    participant_label = models.CharField(max_length=255, blank=True)
+    sort_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        label = self.participant_label or self.participant_id
+        return f"QSortResult: {label}"
+
+
 class SWOTItem(models.Model):
     CATEGORY_CHOICES = [
         ('S', 'Strength'),

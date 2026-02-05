@@ -5,6 +5,7 @@ from datetime import datetime
 import csv
 import json
 import re
+import numpy as np
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -22,6 +23,7 @@ from .models import (
     Indicator,
     MasterIndicator,
     SWOTItem,
+    QSortResult,
 )
 
 
@@ -725,12 +727,190 @@ def get_scenario_data(project: Project) -> dict:
     data.setdefault("actions", [])
     data.setdefault("qsorts", [])
     data.setdefault("scenarios", [])
+    data.setdefault("analysis", {})
     return data
 
 
 def save_scenario_data(project: Project, data: dict) -> None:
     project.scenario_data = data
     project.save(update_fields=["scenario_data"])
+
+
+def _build_qsort_matrix(data):
+    """
+    Build a Q-methodology matrix with rows=statements/actions and columns=persons.
+    Returns (matrix, action_ids, participant_labels).
+    """
+    actions = data.get("actions", [])
+    qsorts = data.get("qsorts", [])
+    if not actions or not qsorts:
+        return None, [], []
+
+    action_ids = [a["id"] for a in actions]
+    participant_labels = [
+        (q.get("participant_label") or f"Participant {idx + 1}")
+        for idx, q in enumerate(qsorts)
+    ]
+    vectors = []
+    for qs in qsorts:
+        dist = qs.get("distribution", {})
+        vec = _vector_from_qsort(dist, action_ids)
+        vectors.append(vec)
+
+    # matrix: rows=actions, cols=participants
+    matrix = np.array(vectors, dtype=float).T
+    return matrix, action_ids, participant_labels
+
+
+def _safe_corrcoef(matrix, rowvar=False):
+    """
+    Compute Pearson correlation; replace NaN/inf with 0 for stability.
+    """
+    if matrix is None or matrix.size == 0:
+        return None
+    corr = np.corrcoef(matrix, rowvar=rowvar)
+    if not np.isfinite(corr).all():
+        corr = np.nan_to_num(corr, nan=0.0, posinf=0.0, neginf=0.0)
+    return corr
+
+
+def _varimax(loadings, gamma=1.0, q=20, tol=1e-6):
+    """
+    Varimax rotation (orthogonal). Returns rotated loadings.
+    """
+    if loadings is None or loadings.size == 0:
+        return loadings
+    p, k = loadings.shape
+    if k <= 1:
+        return loadings
+    r = np.eye(k)
+    d = 0.0
+    for _ in range(q):
+        d_old = d
+        lam = np.dot(loadings, r)
+        u, s, vh = np.linalg.svd(
+            np.dot(
+                loadings.T,
+                (lam ** 3) - (gamma / p) * np.dot(lam, np.diag(np.diag(np.dot(lam.T, lam)))),
+            )
+        )
+        r = np.dot(u, vh)
+        d = np.sum(s)
+        if d_old != 0 and d / d_old < 1 + tol:
+            break
+    return np.dot(loadings, r)
+
+
+def _pearson_r(a, b):
+    """
+    Manual Pearson correlation for two equal-length lists.
+    Returns 0.0 if variance is zero.
+    """
+    n = len(a)
+    if n == 0:
+        return 0.0
+    mean_a = sum(a) / n
+    mean_b = sum(b) / n
+    cov = sum((x - mean_a) * (y - mean_b) for x, y in zip(a, b))
+    var_a = sum((x - mean_a) ** 2 for x in a)
+    var_b = sum((y - mean_b) ** 2 for y in b)
+    if var_a == 0 or var_b == 0:
+        return 0.0
+    return cov / math.sqrt(var_a * var_b)
+
+
+def compute_pearson_correlation(data):
+    """
+    Pre-scenario Pearson correlation between participants.
+    """
+    matrix, _, participant_labels = _build_qsort_matrix(data)
+    if matrix is None:
+        return {"labels": [], "matrix": []}
+
+    corr = _safe_corrcoef(matrix, rowvar=False)
+    return {
+        "labels": participant_labels,
+        "matrix": corr.round(4).tolist() if corr is not None else [],
+    }
+
+
+def compute_scenario_correlation(data):
+    """
+    Post-scenario correlation between scenario composites.
+    """
+    actions = data.get("actions", [])
+    scenarios = data.get("scenarios", [])
+    if not actions or not scenarios:
+        return {"labels": [], "matrix": []}
+
+    action_ids = [a["id"] for a in actions]
+    scenario_ids = [s.get("id") for s in scenarios]
+
+    # Build matrix: rows=actions, cols=scenarios (composite scores)
+    scenario_vectors = []
+    for s in scenarios:
+        composite = s.get("composite_scores", {})
+        vec = [float(composite.get(aid, 0.0)) for aid in action_ids]
+        scenario_vectors.append(vec)
+
+    matrix = np.array(scenario_vectors, dtype=float).T
+    corr = _safe_corrcoef(matrix, rowvar=False)
+    return {
+        "labels": [f"Scenario {sid}" for sid in scenario_ids],
+        "matrix": corr.round(4).tolist() if corr is not None else [],
+    }
+
+
+def compute_factor_loadings(data):
+    """
+    Post-scenario factor analysis on participant correlation matrix.
+    Uses eigenvalues > 1 (Kaiser) to choose number of factors.
+    Returns rotated factor loadings.
+    """
+    matrix, _, participant_labels = _build_qsort_matrix(data)
+    if matrix is None:
+        return {
+            "participants": [],
+            "eigenvalues": [],
+            "n_factors": 0,
+            "loadings": [],
+            "rotated_loadings": [],
+        }
+
+    corr = _safe_corrcoef(matrix, rowvar=False)
+    if corr is None or corr.size == 0:
+        return {
+            "participants": participant_labels,
+            "eigenvalues": [],
+            "n_factors": 0,
+            "loadings": [],
+            "rotated_loadings": [],
+        }
+
+    eigvals, eigvecs = np.linalg.eigh(corr)
+    order = np.argsort(eigvals)[::-1]
+    eigvals = eigvals[order]
+    eigvecs = eigvecs[:, order]
+
+    # Kaiser criterion: eigenvalues > 1
+    n_factors = int(np.sum(eigvals > 1.0))
+    if n_factors == 0:
+        n_factors = 1
+
+    selected_vals = eigvals[:n_factors]
+    selected_vecs = eigvecs[:, :n_factors]
+
+    # Unrotated loadings
+    loadings = selected_vecs * np.sqrt(selected_vals)
+    rotated = _varimax(loadings)
+
+    return {
+        "participants": participant_labels,
+        "eigenvalues": [round(v, 6) for v in eigvals.tolist()],
+        "n_factors": n_factors,
+        "loadings": np.round(loadings, 4).tolist(),
+        "rotated_loadings": np.round(rotated, 4).tolist(),
+    }
 
 @login_required
 def scenario_building_view(request, project_id):
@@ -792,6 +972,68 @@ def scenario_qsort_view(request, project_id):
             "actions": actions,
             "score_levels": score_levels,
             "qsorts": data.get("qsorts", []),
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def correlation_matrix_view(request, project_id):
+    """
+    Stage 3 - Correlation Analysis.
+    Renders participant-by-participant Pearson correlation matrix.
+    """
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    qsort_results = list(project.qsort_results.all().order_by("created_at"))
+
+    if request.method == "POST":
+        return redirect("scenario_results", project_id=project.id)
+
+    if not qsort_results:
+        return render(
+            request,
+            "workshops/correlation_matrix.html",
+            {
+                "project": project,
+                "labels": [],
+                "matrix": [],
+                "empty": True,
+            },
+        )
+
+    # Build participant vectors from stored action->score mappings
+    all_action_ids = set()
+    for r in qsort_results:
+        all_action_ids.update([int(k) for k in (r.sort_data or {}).keys()])
+    action_ids = sorted(all_action_ids)
+
+    labels = []
+    vectors = []
+    for r in qsort_results:
+        label = r.participant_label or r.participant_id
+        labels.append(label)
+        mapping = r.sort_data or {}
+        vec = [float(mapping.get(str(aid), 0.0)) for aid in action_ids]
+        vectors.append(vec)
+
+    # Compute correlation matrix (participants x participants)
+    n = len(vectors)
+    matrix = []
+    for i in range(n):
+        row = []
+        for j in range(n):
+            r_val = _pearson_r(vectors[i], vectors[j])
+            row.append(round(r_val, 4))
+        matrix.append(row)
+
+    return render(
+        request,
+        "workshops/correlation_matrix.html",
+        {
+            "project": project,
+            "labels": labels,
+            "matrix": matrix,
+            "empty": False,
         },
     )
 
@@ -921,6 +1163,13 @@ def run_scenario_extraction(data):
 
     data["scenarios"] = scenarios
     data["last_clustered_at"] = datetime.utcnow().isoformat()
+
+    # Post-scenario analytics
+    analysis = data.get("analysis", {})
+    analysis["scenario_correlation"] = compute_scenario_correlation(data)
+    analysis["factor_analysis"] = compute_factor_loadings(data)
+    analysis["last_analyzed_at"] = datetime.utcnow().isoformat()
+    data["analysis"] = analysis
     return data
 
 
@@ -950,6 +1199,7 @@ def scenario_results_view(request, project_id):
             "scenarios": scenarios,
             "actions": actions,
             "action_by_id": action_by_id,
+            "analysis": data.get("analysis", {}),
         },
     )
 
@@ -1007,6 +1257,29 @@ def save_scenario(request, project_id):
             "distribution": distribution,
         })
         data["qsorts"] = qsorts
+
+        # Persist QSortResult (action_id -> score)
+        action_score_map = {}
+        for score_str, ids in distribution.items():
+            try:
+                score = int(score_str)
+            except ValueError:
+                continue
+            for aid in ids:
+                action_score_map[str(aid)] = score
+
+        participant_id = participant_label or f"Participant {next_id}"
+        QSortResult.objects.create(
+            project=project,
+            participant_id=participant_id,
+            participant_label=participant_label or participant_id,
+            sort_data=action_score_map,
+        )
+
+        analysis = data.get("analysis", {})
+        analysis["pearson_correlation"] = compute_pearson_correlation(data)
+        analysis["last_analyzed_at"] = datetime.utcnow().isoformat()
+        data["analysis"] = analysis
         save_scenario_data(project, data)
         return JsonResponse({"status": "ok", "qsort_id": next_id})
 
