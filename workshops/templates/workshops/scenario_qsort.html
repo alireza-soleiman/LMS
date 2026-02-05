@@ -2,122 +2,166 @@
 {% load static %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
-  <p class="text-muted mb-4">
-    <strong>Stage 2 – Q-Sorting Simulation:</strong>
-    Choose a role and sort the actions into the forced distribution grid from -3 (most disagree) to +3 (most agree).
-  </p>
+<style>
+    /* Custom styles for the Q-Sort interface */
+    .q-bucket {
+        min-height: 150px;
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    .q-bucket.drag-over {
+        background-color: #e2e6ea;
+        border-color: #6c757d;
+    }
+    .q-bucket.full {
+        background-color: #fff3cd; /* Yellow tint when full */
+        border-style: solid;
+        border-color: #ffc107;
+    }
+    .q-card {
+        cursor: move;
+        transition: transform 0.1s;
+    }
+    .q-card:active {
+        transform: scale(1.02);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .sortable-ghost {
+        opacity: 0.4;
+        background-color: #cfe2ff;
+    }
+</style>
 
-  <div class="card mb-3">
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+          <h2>Workshop 5 — Stage 2: Q-Sorting</h2>
+          <p class="text-muted mb-0">
+            Drag actions from the unsorted pile into the grid below based on your agreement level (-3 to +3).
+          </p>
+      </div>
+      <div class="text-end">
+          <span id="progress-badge" class="badge bg-danger fs-6 p-2">
+              <i class="bi bi-exclamation-circle-fill me-1"></i>
+              <span id="unsorted-count">{{ actions|length }}</span> items left to sort
+          </span>
+      </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm border-0 bg-light">
     <div class="card-body row g-3">
       <div class="col-md-6">
-        <label class="form-label">Participant label</label>
-        <input id="participant_label" type="text" class="form-control" placeholder="e.g. Citizen 1">
+        <label class="form-label fw-bold">Participant Label</label>
+        <input id="participant_label" type="text" class="form-control" placeholder="e.g. Stakeholder A">
       </div>
       <div class="col-md-6">
-        <label class="form-label">Role</label>
-        <input id="role" type="text" class="form-control" placeholder="e.g. Citizen, Public Administration, Expert">
+        <label class="form-label fw-bold">Role / Category</label>
+        <select id="role" class="form-select">
+            <option value="">Choose a role...</option>
+            <option value="Citizen">Citizen / Resident</option>
+            <option value="Expert">Expert / Academic</option>
+            <option value="Admin">Public Administration</option>
+            <option value="Business">Private Sector / Business</option>
+            <option value="Other">Other</option>
+        </select>
       </div>
     </div>
   </div>
 
-  <div class="card mb-3">
-    {% if qsorts %}
-<div class="card mb-3">
-  <div class="card-header">
-    Saved Q-Sorts
-  </div>
-  <div class="card-body">
-    {% for s in qsorts %}
-      <div class="border rounded p-2 mb-2 bg-light">
-        <strong>{{ s.participant_label }}</strong>
-        <span class="text-muted">(Role: {{ s.role }})</span><br>
-        <small class="text-muted">Saved at: {{ s.created_at }}</small>
-      </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-    <div class="card-header">
-      Unsorted Actions
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between">
+      <span><i class="bi bi-inbox me-1"></i> Unsorted Actions</span>
+      <span class="small text-white-50">Drag these cards down</span>
     </div>
-    <div class="card-body">
-      <div id="unsorted" class="row g-2">
+    <div class="card-body bg-light">
+      <div id="unsorted" class="row g-2" style="min-height: 100px;">
         {% for action in actions %}
-          <div class="col-md-4">
-            <div class="card q-card mb-2" data-action-id="{{ action.id }}">
-              <div class="card-body p-2">
-                <small>{{ action.text }}</small>
+          <div class="col-md-4 draggable-wrapper">
+            <div class="card q-card h-100 shadow-sm border-0" data-action-id="{{ action.id }}">
+              <div class="card-body p-3">
+                <span class="badge bg-secondary mb-1">#{{ action.id }}</span>
+                <p class="mb-0 small fw-bold">{{ action.text }}</p>
               </div>
             </div>
           </div>
         {% endfor %}
       </div>
-      <small class="text-muted">Drag each card into the grid below.</small>
     </div>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-header">
-      Forced Distribution Grid (from -3: most disagree to +3: most agree)
+<div class="card mb-4 shadow-sm border-primary">
+    <div class="card-header bg-primary text-white text-center">
+      <strong>Forced Distribution Grid</strong>
     </div>
     <div class="card-body">
-      <div class="row text-center mb-2">
-        <div class="col">-3</div>
-        <div class="col">-2</div>
-        <div class="col">-1</div>
-        <div class="col">0</div>
-        <div class="col">+1</div>
-        <div class="col">+2</div>
-        <div class="col">+3</div>
+
+      <div class="row text-center mb-2 fw-bold text-muted small text-uppercase">
+        <div class="col" style="color: #dc3545;">Most Disagree</div>
+        <div class="col">Neutral</div>
+        <div class="col" style="color: #198754;">Most Agree</div>
       </div>
 
-      <!-- Simple pyramid capacity example: 2–3–4–5–4–3–2 (adapt as you like) -->
-            <!-- Simple pyramid capacity example: 2–3–4–5–4–3–2 (adapt as you like) -->
-      <div class="row">
+      <div class="row g-2">
         {% for score in score_levels %}
-          <div class="col">
-            <div class="q-bucket border p-2 mb-1"
-                 data-score="{{ score }}"
-                 data-capacity="{% if score == '-3' or score == '3' %}2
-                                {% elif score == '-2' or score == '2' %}3
-                                {% elif score == '-1' or score == '1' %}4
-                                {% else %}5
-                                {% endif %}">
+          <div class="col text-center">
+
+            <div class="mb-2">
+                <span class="badge rounded-pill
+                    {% if score|first == '-' %}bg-danger{% elif score == '0' %}bg-secondary{% else %}bg-success{% endif %}">
+                    {{ score }}
+                </span>
             </div>
-            <small class="text-muted">
-              Max:
-              {% if score == '-3' or score == '3' %}2
-              {% elif score == '-2' or score == '2' %}3
-              {% elif score == '-1' or score == '1' %}4
-              {% else %}5
-              {% endif %}
-            </small>
+
+            {% if score == '-3' or score == '3' %}
+                <div class="q-bucket" id="bucket-{{ score }}" data-score="{{ score }}" data-capacity="2"></div>
+                <div class="mt-1"><span class="bucket-counter badge bg-light text-dark border">0 / 2</span></div>
+
+            {% elif score == '-2' or score == '2' %}
+                <div class="q-bucket" id="bucket-{{ score }}" data-score="{{ score }}" data-capacity="3"></div>
+                <div class="mt-1"><span class="bucket-counter badge bg-light text-dark border">0 / 3</span></div>
+
+            {% elif score == '-1' or score == '1' %}
+                <div class="q-bucket" id="bucket-{{ score }}" data-score="{{ score }}" data-capacity="4"></div>
+                <div class="mt-1"><span class="bucket-counter badge bg-light text-dark border">0 / 4</span></div>
+
+            {% else %}
+                <div class="q-bucket" id="bucket-{{ score }}" data-score="{{ score }}" data-capacity="5"></div>
+                <div class="mt-1"><span class="bucket-counter badge bg-light text-dark border">0 / 5</span></div>
+            {% endif %}
+
           </div>
         {% endfor %}
       </div>
     </div>
   </div>
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-5">
     <a href="{% url 'scenario_building' project.id %}" class="btn btn-outline-secondary">
-      ← Back to Actions
+      ← Edit Actions
     </a>
     <div>
-      <button id="save-qsort" type="button" class="btn btn-primary">
-        Save Q-Sort
+      <button id="save-qsort" type="button" class="btn btn-primary btn-lg px-5" disabled>
+        <i class="bi bi-save me-1"></i> Save Q-Sort
       </button>
-      <a href="{% url 'scenario_correlation' project.id %}" class="btn btn-success ms-2">
-        Correlation Analysis →
+      <a href="{% url 'scenario_correlation' project.id %}" class="btn btn-outline-success ms-2">
+        Skip to Results →
       </a>
     </div>
   </div>
 
-  <div id="qsort-feedback" class="text-success d-none">
-    Q-sort saved successfully.
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="toast-success" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-check-circle me-2"></i> Q-Sort saved successfully!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
   </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -125,38 +169,112 @@
   const csrftoken = '{{ csrf_token }}';
 
   document.addEventListener('DOMContentLoaded', function () {
-    // Make unsorted draggable (multi-column)
     const unsortedContainer = document.getElementById('unsorted');
-    Sortable.create(unsortedContainer, {
-      group: 'qgroup',
-      animation: 150,
-      handle: '.q-card',
-      draggable: '.col-md-4'
-    });
+    const buckets = document.querySelectorAll('.q-bucket');
+    const saveBtn = document.getElementById('save-qsort');
+    const badge = document.getElementById('progress-badge');
+    const countSpan = document.getElementById('unsorted-count');
+    const toastEl = document.getElementById('toast-success');
+    const toast = new bootstrap.Toast(toastEl);
 
-    // Buckets
-    document.querySelectorAll('.q-bucket').forEach(bucket => {
-      Sortable.create(bucket, {
+    // 1. Helper: Update counts and Validation State
+    function updateState() {
+        // Count unsorted
+        const unsortedCount = unsortedContainer.querySelectorAll('.q-card').length;
+        countSpan.innerText = unsortedCount;
+
+        // Update Badge Color
+        if (unsortedCount === 0) {
+            badge.className = "badge bg-success fs-6 p-2";
+            badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> All sorted!';
+            saveBtn.disabled = false;
+        } else {
+            badge.className = "badge bg-danger fs-6 p-2";
+            badge.innerHTML = `<i class="bi bi-exclamation-circle-fill me-1"></i> ${unsortedCount} items left`;
+            saveBtn.disabled = true;
+        }
+
+        // Update Bucket Counters
+        buckets.forEach(bucket => {
+            const count = bucket.querySelectorAll('.q-card').length;
+            const cap = parseInt(bucket.dataset.capacity);
+            const counterBadge = bucket.nextElementSibling.querySelector('.bucket-counter');
+
+            counterBadge.innerText = `${count} / ${cap}`;
+
+            // Visual feedback for full buckets
+            if (count >= cap) {
+                bucket.classList.add('full');
+                counterBadge.classList.replace('bg-light', 'bg-warning');
+            } else {
+                bucket.classList.remove('full');
+                counterBadge.classList.replace('bg-warning', 'bg-light');
+            }
+        });
+    }
+
+    // 2. Initialize Sortable for UNSORTED area
+    Sortable.create(unsortedContainer, {
         group: 'qgroup',
         animation: 150,
+        ghostClass: 'sortable-ghost',
         onAdd: function (evt) {
-          const capacity = parseInt(bucket.dataset.capacity || '99', 10);
-          if (bucket.children.length > capacity) {
-            // Reject if over capacity: move back to unsorted
+            // When card comes BACK to unsorted, restore grid class
             const item = evt.item;
-            unsortedContainer.appendChild(item.closest('.col-md-4') || item);
-            alert('This column is full. Please move some cards elsewhere.');
-          }
+            item.classList.add('col-md-4');
+            item.classList.remove('mb-2'); // remove bucket spacing
+            updateState();
+        },
+        onRemove: function (evt) {
+             updateState();
         }
-      });
     });
 
-    document.getElementById('save-qsort').addEventListener('click', function () {
+    // 3. Initialize Sortable for BUCKETS
+    buckets.forEach(bucket => {
+        Sortable.create(bucket, {
+            group: 'qgroup',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onAdd: function (evt) {
+                const item = evt.item;
+                const capacity = parseInt(bucket.dataset.capacity);
+                const currentCount = bucket.querySelectorAll('.q-card').length; // count includes the new item
+
+                // Check Capacity
+                if (currentCount > capacity) {
+                    // Revert move
+                    unsortedContainer.appendChild(item);
+                    item.classList.add('col-md-4'); // restore grid
+                    alert('This column is full! Max ' + capacity + ' cards.');
+                } else {
+                    // Accepted: Remove grid class for cleaner stacking
+                    item.classList.remove('col-md-4');
+                    item.classList.add('mb-2'); // add spacing
+                }
+                updateState();
+            },
+            onRemove: function(evt) {
+                updateState();
+            }
+        });
+    });
+
+    // Initial check
+    updateState();
+
+    // 4. SAVE HANDLER
+    saveBtn.addEventListener('click', function () {
       const participant_label = document.getElementById('participant_label').value.trim();
-      const role = document.getElementById('role').value.trim();
+      const role = document.getElementById('role').value;
+
+      if(!participant_label || !role) {
+          alert("Please enter a Participant Label and select a Role.");
+          return;
+      }
 
       const distribution = {};
-      document.querySelectorAll('.q-bucket').forEach(bucket => {
+      buckets.forEach(bucket => {
         const score = bucket.dataset.score;
         const ids = [];
         bucket.querySelectorAll('.q-card').forEach(card => {
@@ -178,31 +296,17 @@
       })
       .then(res => res.json())
       .then(data => {
-
-    // Show success
-    const fb = document.getElementById('qsort-feedback');
-    fb.classList.remove('d-none');
-
-    // 1️⃣ Reset all cards back to UNSORTED
-    const unsortedRow = document.getElementById('unsorted');
-    const allCards = document.querySelectorAll('.q-card');
-    allCards.forEach(card => {
-        const wrapper = card.closest('.col-md-4');
-        unsortedRow.appendChild(wrapper);
-    });
-
-    // 2️⃣ Clear participant label + role inputs
-    document.getElementById('participant_label').value = '';
-    document.getElementById('role').value = '';
-
-    // 3️⃣ Reload saved Q-sorts by refreshing part of the page
-    location.reload();
-
-    setTimeout(() => fb.classList.add('d-none'), 2500);
-})
+          if(data.status === 'ok') {
+              toast.show();
+              // Optional: Clear board after save
+              setTimeout(() => location.reload(), 1500);
+          } else {
+              alert('Error saving: ' + data.message);
+          }
+      })
       .catch(err => {
         console.error(err);
-        alert('Error saving Q-sort.');
+        alert('Network error saving Q-sort.');
       });
     });
   });
