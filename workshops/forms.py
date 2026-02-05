@@ -30,13 +30,6 @@ class ProblemForm(forms.ModelForm):
             'color': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
         }
 class ObjectiveForm(forms.ModelForm):
-    parent = forms.ModelChoiceField(
-        queryset=Objective.objects.none(),
-        required=False,
-        label="Parent objective",
-        help_text="Optional: choose the objective this one depends on.",
-    )
-
     class Meta:
         model = Objective
         fields = ["description", "objective_type", "parent", "color"]
@@ -56,10 +49,10 @@ class ObjectiveForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         project = kwargs.pop("project", None)
         super().__init__(*args, **kwargs)
-        if project is not None:
+        if project:
+            # This ensures the dropdown only shows objectives from THIS project
             self.fields["parent"].queryset = Objective.objects.filter(project=project)
-# workshops/forms.py  (add near other forms)
-
+            self.fields["parent"].empty_label = "None (Root Objective)"
 from django.core.exceptions import ValidationError
 
 class IndicatorForm(forms.ModelForm):

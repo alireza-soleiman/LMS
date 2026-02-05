@@ -912,33 +912,55 @@ def compute_factor_loadings(data):
         "rotated_loadings": np.round(rotated, 4).tolist(),
     }
 
+
 @login_required
 def scenario_building_view(request, project_id):
-    """Stage 1 – Development of Research Instrument (actions CRUD)."""
+    """
+    Stage 1: Define Actions with Modal Support.
+    """
     project = get_object_or_404(Project, id=project_id, owner=request.user)
     data = get_scenario_data(project)
-    actions = data["actions"]
-
-    # Simple auto-id for actions
-    next_id = max([a["id"] for a in actions], default=0) + 1
+    actions = data.get("actions", [])
 
     if request.method == "POST":
-        # Non-AJAX form fallback (optional)
-        texts = request.POST.getlist("action_text[]")
-        new_actions = []
-        _id = 1
-        for t in texts:
-            t = t.strip()
-            if not t:
-                continue
-            new_actions.append({
-                "id": _id,
-                "text": t,
-                "created_at": datetime.utcnow().isoformat()
-            })
-            _id += 1
-        data["actions"] = new_actions
-        save_scenario_data(project, data)
+        action_type = request.POST.get("action_type")
+
+        # 1. ADD NEW ACTION
+        if action_type == "add":
+            new_text = request.POST.get("new_action", "").strip()
+            if new_text:
+                next_id = max([a["id"] for a in actions], default=0) + 1
+                actions.append({
+                    "id": next_id,
+                    "text": new_text,
+                    "created_at": datetime.utcnow().isoformat()
+                })
+                data["actions"] = actions
+                save_scenario_data(project, data)
+
+        # 2. DELETE ACTION (From Modal)
+        elif action_type == "delete":
+            delete_id = request.POST.get("action_id")
+            if delete_id:
+                # Keep actions that are NOT the one being deleted
+                actions = [a for a in actions if str(a["id"]) != str(delete_id)]
+                data["actions"] = actions
+                save_scenario_data(project, data)
+
+        # 3. EDIT SINGLE ACTION (From Modal)
+        elif action_type == "edit_single":
+            edit_id = request.POST.get("action_id")
+            new_text = request.POST.get("action_text", "").strip()
+
+            if edit_id and new_text:
+                # Find the action and update its text
+                for a in actions:
+                    if str(a["id"]) == str(edit_id):
+                        a["text"] = new_text
+                        break
+                data["actions"] = actions
+                save_scenario_data(project, data)
+
         return redirect("scenario_building", project_id=project.id)
 
     return render(
@@ -1095,26 +1117,30 @@ def _kmeans(qsort_vectors, k=3, max_iter=25):
     return assignments
 
 
+# In views.py
 def run_scenario_extraction(data):
     actions = data.get("actions", [])
     qsorts = data.get("qsorts", [])
+
     if not actions or not qsorts:
         data["scenarios"] = []
         return data
 
     action_ids = [a["id"] for a in actions]
 
-    # Build vectors
+    # 1. Master Lookup
+    action_lookup = {str(a["id"]): a["text"] for a in actions}
+
+    # 2. KMeans
     vectors = []
     for qs in qsorts:
         dist = qs.get("distribution", {})
         vec = _vector_from_qsort(dist, action_ids)
         vectors.append(vec)
 
-    # Cluster into 3 scenarios
     assignments = _kmeans(vectors, k=3)
 
-    # Group qsort indices by cluster
+    # 3. Group Indices
     clusters = {}
     for idx, cluster_id in enumerate(assignments):
         clusters.setdefault(cluster_id, []).append(idx)
@@ -1126,36 +1152,40 @@ def run_scenario_extraction(data):
         if not q_indices:
             continue
 
-        # Compute composite score per action (average across qsorts in this cluster)
-        composite = {aid: 0.0 for aid in action_ids}
+        # 4. Compute Scores
+        composite = {str(aid): 0.0 for aid in action_ids}
         for aid_idx, aid in enumerate(action_ids):
             scores = [vectors[i][aid_idx] for i in q_indices]
-            composite[aid] = sum(scores) / len(scores)
+            composite[str(aid)] = sum(scores) / len(scores)
 
-        # Sort actions by composite score descending
-        sorted_actions = sorted(action_ids, key=lambda aid: composite[aid], reverse=True)
-        top_actions_ids = sorted_actions[:3]
-        top_actions_texts = [
-            next(a["text"] for a in actions if a["id"] == tid)
-            for tid in top_actions_ids
-        ]
+        # 5. Build Ranking List
+        sorted_ids = sorted(action_ids, key=lambda x: composite[str(x)], reverse=True)
 
-        # Title + description suggestion
-        main_action = top_actions_texts[0] if top_actions_texts else "Key action"
-        title = f"Scenario {scenario_counter}: {main_action[:60]}"
+        ranking_list = []
+        for aid in sorted_ids:
+            clean_text = action_lookup.get(str(aid), f"Action {aid}")
+            score_val = composite[str(aid)]
+            ranking_list.append({
+                'id': aid,
+                'text': clean_text,
+                'score': score_val
+            })
 
-        description_parts = [
-            "This scenario groups participants who strongly support:",
-        ]
-        for t in top_actions_texts:
-            description_parts.append(f"• {t}")
-        description = "\n".join(description_parts)
+        top_3_objects = ranking_list[:3]
+
+        # *** FIX FOR DUPLICATION ***
+        # Instead of listing the actions here, we use a generic description.
+        description = (
+            f"Scenario {scenario_counter} represents a distinct perspective within the group. "
+            "The participants in this cluster prioritized the actions listed below."
+        )
 
         scenarios.append({
             "id": scenario_counter,
-            "title": title,
+            "title": f"Scenario {scenario_counter}",
             "description": description,
-            "top_actions": top_actions_ids,
+            "top_actions_objects": top_3_objects,
+            "ranking": ranking_list,
             "composite_scores": composite,
         })
 
@@ -1164,32 +1194,26 @@ def run_scenario_extraction(data):
     data["scenarios"] = scenarios
     data["last_clustered_at"] = datetime.utcnow().isoformat()
 
-    # Post-scenario analytics
+    # Analytics
     analysis = data.get("analysis", {})
     analysis["scenario_correlation"] = compute_scenario_correlation(data)
     analysis["factor_analysis"] = compute_factor_loadings(data)
-    analysis["last_analyzed_at"] = datetime.utcnow().isoformat()
     data["analysis"] = analysis
+
     return data
-
-
 @login_required
 def scenario_results_view(request, project_id):
-    """Stage 3–4 – Show scenarios + allow recalculation + PDF export."""
     project = get_object_or_404(Project, id=project_id, owner=request.user)
     data = get_scenario_data(project)
 
     if request.method == "POST":
-        # Trigger clustering
+        # Recalculate everything with the new logic
         data = run_scenario_extraction(data)
         save_scenario_data(project, data)
         return redirect("scenario_results", project_id=project.id)
 
     actions = data.get("actions", [])
     scenarios = data.get("scenarios", [])
-
-    # Make a quick lookup for actions by id for template use
-    action_by_id = {a["id"]: a for a in actions}
 
     return render(
         request,
@@ -1198,12 +1222,9 @@ def scenario_results_view(request, project_id):
             "project": project,
             "scenarios": scenarios,
             "actions": actions,
-            "action_by_id": action_by_id,
             "analysis": data.get("analysis", {}),
         },
     )
-
-
 @require_POST
 @login_required
 def save_scenario(request, project_id):

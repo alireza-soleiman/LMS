@@ -4,243 +4,228 @@
 
 {% block content %}
 <div class="container mt-4">
-  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
-  <p class="text-muted mb-4">
-    <strong>Stage 3–4 – Scenario Extraction & Reporting:</strong>
-    The Q-sorts are clustered into 3 scenarios. Review, interpret, and export a PDF summary.
-  </p>
-
-  <div class="d-flex justify-content-between mb-3">
-    <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
-      ← Back to Q-Sorting
-    </a>
-
-    <form method="post" class="d-inline">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-primary">
-        Recalculate Scenarios
-      </button>
-    </form>
-  </div>
-
-  {% if not scenarios %}
-    <div class="alert alert-info">
-      No scenarios generated yet. Please make sure you have defined actions and at least one Q-sort,
-      then click <strong>Recalculate Scenarios</strong>.
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Workshop 5 — Scenario Building</h2>
+            <p class="text-muted mb-0">Stage 4: Scenario Extraction, Reporting, and Analytics</p>
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
+                ← Back to Q-Sorting
+            </a>
+            <form method="post" class="d-inline ms-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">
+                    Recalculate Scenarios
+                </button>
+            </form>
+        </div>
     </div>
 
-  {% else %}
-    <div id="scenarios-container" class="row g-3">
+    {% if not scenarios %}
+    <div class="alert alert-info shadow-sm">
+        No scenarios generated yet. Please click <strong>Recalculate Scenarios</strong> to process the data.
+    </div>
+    {% else %}
 
-      {% for scenario in scenarios %}
-      <div class="col-md-4">
-        <div class="card h-100">
-          <div class="card-header">
-            {{ scenario.title }}
-          </div>
+    <div id="scenarios-container" class="row g-4">
+        {% for scenario in scenarios %}
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold">
+                    {{ scenario.title }}
+                </div>
+                <div class="card-body">
+                    <p class="small text-secondary white-space-pre-line mb-4">{{ scenario.description }}</p>
 
-          <div class="card-body">
-            <p class="small white-space-pre-line">{{ scenario.description }}</p>
+                    <h6 class="border-bottom pb-2 mb-3 text-primary">Top Preferred Actions</h6>
+                    <ul class="list-group list-group-flush mb-4">
+                        {% for obj in scenario.top_actions_objects %}
+                            <li class="list-group-item px-0 py-2 small border-0">
+                                <span class="badge bg-primary rounded-pill me-2">{{ forloop.counter }}</span>
+                                {{ obj.text }}
+                            </li>
+                        {% endfor %}
+                    </ul>
 
-            <!-- TOP 3 ACTIONS -->
-            <h6>Top 3 preferred actions</h6>
-            <ol class="small">
-              {% for aid in scenario.top_actions %}
-                {% with action=action_by_id|dict_get:aid %}
-                  {% if action %}
-                    <li>{{ action.text }}</li>
-                  {% endif %}
-                {% endwith %}
-              {% endfor %}
-            </ol>
-
-            <!-- FULL RANKING -->
-            <h6 class="mt-3">Full ranking (composite scores)</h6>
-            <table class="table table-sm table-bordered small">
-              <thead>
-                <tr>
-                  <th>Action</th>
-                  <th class="text-end">Score</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {% for aid, score in scenario.composite_scores.items|dictsortreversed:"1" %}
-                  {% with action=action_by_id|dict_get:aid %}
-                    <tr>
-                      <td>{{ action.text }}</td>
-                      <td class="text-end">{{ score|floatformat:2 }}</td>
-                    </tr>
-                  {% endwith %}
-                {% endfor %}
-              </tbody>
-            </table>
-
-          </div>
+                    <h6 class="border-bottom pb-2 mb-3 text-secondary">Full Ranking</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Action</th>
+                                    <th class="text-end" style="width: 80px;">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in scenario.ranking %}
+                                <tr>
+                                    <td class="text-truncate" style="max-width: 150px;" title="{{ row.text }}">
+                                        {{ row.text }}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex align-items-center justify-content-end">
+                                            <span class="me-2 fw-bold">{{ row.score|floatformat:2 }}</span>
+                                            <div class="progress" style="width: 40px; height: 4px;">
+                                                <div class="progress-bar bg-info"
+                                                     style="width: {{ row.score|add:3|default:0|floatformat:0 }}0%">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="2" class="text-center text-muted">No ranking data available</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-      {% endfor %}
-
+        {% endfor %}
     </div>
 
     {% if analysis %}
-    <div class="mt-5">
-      <h4>Q-Methodology Analytics</h4>
+    <div class="mt-5 pt-4 border-top">
+        <h4 class="mb-4">Methodology Analytics</h4>
 
-      {% if analysis.pearson_correlation %}
-      <div class="mt-3">
-        <h6>Pearson Correlation (Participants)</h6>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered small">
-            <thead>
-              <tr>
-                <th>Participant</th>
-                {% for label in analysis.pearson_correlation.labels %}
-                  <th class="text-end">{{ label }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in analysis.pearson_correlation.matrix %}
-                <tr>
-                  <td>{{ analysis.pearson_correlation.labels|list_get:forloop.counter0 }}</td>
-                  {% for value in row %}
-                    <td class="text-end">{{ value|floatformat:3 }}</td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="row g-4">
+            {% if analysis.scenario_correlation %}
+            <div class="col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="card-title fw-bold">Correlation Between Scenarios</h6>
+                        <div class="table-responsive mt-3">
+                            <table class="table table-sm table-bordered small">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Scenario</th>
+                                        {% for label in analysis.scenario_correlation.labels %}
+                                            <th class="text-end">{{ label }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in analysis.scenario_correlation.matrix %}
+                                    <tr>
+                                        <td class="fw-bold">{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
+                                        {% for value in row %}
+                                            <td class="text-end {% if value > 0.7 %}table-success{% elif value < -0.3 %}table-danger{% endif %}">
+                                                {{ value|floatformat:3 }}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if analysis.factor_analysis %}
+            <div class="col-lg-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="card-title fw-bold">Rotated Factor Loadings</h6>
+                        <p class="small text-muted mb-3">
+                            Factors (Kaiser > 1): <strong>{{ analysis.factor_analysis.n_factors }}</strong>
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered small text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start">Participant</th>
+                                        {% for _ in analysis.factor_analysis.rotated_loadings|list_get:0 %}
+                                            <th>F{{ forloop.counter }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in analysis.factor_analysis.rotated_loadings %}
+                                    <tr>
+                                        <td class="text-start">{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
+                                        {% for value in row %}
+                                            <td class="{% if value > 0.45 or value < -0.45 %}table-warning fw-bold{% endif %}">
+                                                {{ value|floatformat:3 }}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
-      </div>
-      {% endif %}
-
-      {% if analysis.scenario_correlation %}
-      <div class="mt-3">
-        <h6>Correlation Between Scenarios</h6>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered small">
-            <thead>
-              <tr>
-                <th>Scenario</th>
-                {% for label in analysis.scenario_correlation.labels %}
-                  <th class="text-end">{{ label }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in analysis.scenario_correlation.matrix %}
-                <tr>
-                  <td>{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
-                  {% for value in row %}
-                    <td class="text-end">{{ value|floatformat:3 }}</td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
-
-      {% if analysis.factor_analysis %}
-      <div class="mt-3">
-        <h6>Factor Loadings</h6>
-        <p class="small text-muted mb-2">
-          Eigenvalues: {{ analysis.factor_analysis.eigenvalues|join:", " }}.
-          Number of factors (Kaiser &gt; 1): {{ analysis.factor_analysis.n_factors }}.
-        </p>
-
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered small">
-            <thead>
-              <tr>
-                <th>Participant</th>
-                {% for _ in analysis.factor_analysis.rotated_loadings|list_get:0 %}
-                  <th class="text-end">F{{ forloop.counter }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in analysis.factor_analysis.rotated_loadings %}
-                <tr>
-                  <td>{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
-                  {% for value in row %}
-                    <td class="text-end">{{ value|floatformat:3 }}</td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
     </div>
     {% endif %}
 
-    <div class="mt-4">
-      <button id="download-pdf" class="btn btn-success">
-        Download PDF Summary
-      </button>
+    <div class="mt-5 mb-5">
+        <button id="download-pdf" class="btn btn-success">
+            Download PDF Summary
+        </button>
     </div>
-
-  {% endif %}
+    {% endif %}
 </div>
 
-<!-- PDF EXPORT SCRIPT -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-        integrity="sha512-v2kKQf9yDgLwJ2p4lCyLuXyqkdwC3Jd0QYQH+0vO/0kntv5TbqOk0zGvjS5LJ9chrr69WvYk5fqPNPz7DgXnXw=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const btn = document.getElementById('download-pdf');
-  if (!btn) return;
+    const btn = document.getElementById('download-pdf');
+    if (!btn) return;
 
-  btn.addEventListener('click', function () {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    btn.addEventListener('click', function () {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        let y = 20;
 
-    let y = 10;
-    doc.setFontSize(14);
-    doc.text('Workshop 5 – Scenario Building Summary', 10, y);
-    y += 8;
+        doc.setFontSize(16);
+        doc.text('Scenario Building Summary', 10, y);
+        y += 10;
+        doc.setFontSize(11);
 
-    const cards = document.querySelectorAll('#scenarios-container .card');
-    doc.setFontSize(11);
+        const cards = document.querySelectorAll('#scenarios-container .card');
+        cards.forEach((card) => {
+            if (y > 260) { doc.addPage(); y = 20; }
 
-    cards.forEach((card) => {
-      if (y > 270) {
-        doc.addPage();
-        y = 10;
-      }
+            // Get Title
+            const title = card.querySelector('.card-header').innerText;
+            doc.setFont(undefined, 'bold');
+            doc.text(title, 10, y);
+            y += 7;
 
-      const title = card.querySelector('.card-header').innerText.trim();
-      doc.text(title, 10, y);
-      y += 6;
+            // Get Description
+            doc.setFont(undefined, 'normal');
+            const desc = card.querySelector('.card-body p').innerText;
+            const splitDesc = doc.splitTextToSize(desc, 180);
+            doc.text(splitDesc, 10, y);
+            y += (splitDesc.length * 5) + 5;
 
-      const desc = card.querySelector('.card-body p').innerText.trim();
-      const descLines = doc.splitTextToSize(desc, 180);
-      doc.text(descLines, 10, y);
-      y += 6 + (descLines.length - 1) * 6;
+            // Get Top Actions
+            const topActions = card.querySelectorAll('ul li');
+            if(topActions.length > 0) {
+                doc.text('Top Actions:', 10, y);
+                y += 6;
+                topActions.forEach(li => {
+                    let text = li.innerText.replace(/^\d+\s*/, '').trim();
+                    doc.text('• ' + text, 15, y);
+                    y += 6;
+                });
+            }
+            y += 10;
+        });
 
-      const topList = card.querySelectorAll('ol li');
-      doc.text('Top 3 preferred actions:', 10, y);
-      y += 6;
-
-      topList.forEach(li => {
-        const text = '- ' + li.innerText.trim();
-        const lines = doc.splitTextToSize(text, 180);
-        doc.text(lines, 12, y);
-        y += 6 * lines.length;
-      });
-
-      y += 4;
+        doc.save('scenarios.pdf');
     });
-
-    doc.save('scenario_building_summary.pdf');
-  });
 });
 </script>
 
+<style>
+    .white-space-pre-line { white-space: pre-line; }
+</style>
 {% endblock %}
