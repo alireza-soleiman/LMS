@@ -3,61 +3,108 @@
 
 {% block content %}
 <div class="container mt-4">
-  <h2>Workshop 5 — Scenario Building (Q-Methodology)</h2>
-  <p class="text-muted mb-4">
-    <strong>Stage 3 – Correlation Analysis:</strong>
-    Review the Pearson correlation matrix between participants before proceeding to scenario results.
-  </p>
-
-  <div class="d-flex justify-content-between mb-3">
-    <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
-      ← Back to Q-Sorting
-    </a>
-
-    <form method="post" class="d-inline">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-primary">
-        Confirm &amp; Proceed
-      </button>
-    </form>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>Workshop 5 — Stage 3: Correlation Analysis</h2>
+        <p class="text-muted mb-0">
+            Review the agreement levels between participants before extracting scenarios.
+        </p>
+    </div>
+    <div>
+        <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Q-Sorting
+        </a>
+        <form method="post" class="d-inline ms-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">
+                Proceed to Scenario Extraction <i class="bi bi-arrow-right"></i>
+            </button>
+        </form>
+    </div>
   </div>
 
   {% if empty %}
-    <div class="alert alert-info">
-      No participant Q-sorts found yet. Please save at least one Q-sort, then return here.
+    <div class="alert alert-info shadow-sm p-5 text-center">
+      <i class="bi bi-bar-chart-line display-4 d-block mb-3"></i>
+      <h4>Insufficient Data</h4>
+      <p class="text-muted">You need at least two participants to calculate correlations.</p>
+      <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-sm btn-primary">Go add participants</a>
     </div>
   {% else %}
-      <div class="mb-3">
-    <span class="badge bg-success">Strong Positive (> 0.7)</span>
-    <span class="badge bg-danger">Strong Negative (< -0.7)</span>
-    <span class="badge bg-light text-dark border">Neutral</span>
-</div>
-    <div class="table-responsive">
-      <table class="table table-sm table-bordered small">
-        <thead>
-          <tr>
-            <th>Participant</th>
-            {% for label in labels %}
-              <th class="text-end">{{ label }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in matrix %}
-            <tr>
-              <td>{{ labels|list_get:forloop.counter0 }}</td>
-              {% for value in row %}
-                <td class="text-end"
-    style="background-color:
-        {% if value > 0.7 %}rgba(40, 167, 69, {{ value }}){% elif value < -0.7 %}rgba(220, 53, 69, {{ value|cut:"-" }}){% endif %};
-        color: {% if value > 0.7 or value < -0.7 %}white{% else %}black{% endif %};">
-    {{ value|floatformat:3 }}
-</td>
-              {% endfor %}
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+    <div class="card mb-3 shadow-sm border-0 bg-light">
+        <div class="card-body py-2 d-flex align-items-center justify-content-between">
+            <div class="small">
+                <span class="fw-bold me-2">Legend:</span>
+                <span class="badge me-1" style="background-color: #28a745; opacity: 0.9;">High Agreement (> 0.5)</span>
+                <span class="badge me-1" style="background-color: #dc3545; opacity: 0.9;">Disagreement (< -0.3)</span>
+                <span class="badge bg-white text-dark border">Neutral</span>
+            </div>
+            <div class="small text-muted">
+                <i class="bi bi-info-circle me-1"></i> Diagonal values (self-correlation) are masked.
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm small mb-0 text-center align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th class="bg-light sticky-top text-start ps-3" style="min-width: 150px; z-index: 5;">Participant</th>
+
+                    {% for label in labels %}
+                      <th class="sticky-top bg-light" style="height: 120px; vertical-align: bottom; z-index: 1;">
+                          <div style="writing-mode: vertical-rl; transform: rotate(180deg); margin: 0 auto; white-space: nowrap;">
+                              {{ label }}
+                          </div>
+                      </th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in matrix %}
+                    <tr>
+                      <td class="fw-bold text-start bg-light ps-3">{{ labels|list_get:forloop.counter0 }}</td>
+
+                      {% for value in row %}
+                        {% if forloop.parentloop.counter0 == forloop.counter0 %}
+                            <td style="background: repeating-linear-gradient(45deg, #f8f9fa, #f8f9fa 5px, #e9ecef 5px, #e9ecef 10px);">
+                                <span class="text-muted opacity-25">-</span>
+                            </td>
+                        {% else %}
+                            <td style="
+                                background-color:
+                                    {% if value > 0 %}rgba(40, 167, 69, {{ value }})
+                                    {% else %}rgba(220, 53, 69, {{ value|stringformat:'f'|slice:'1:' }})
+                                    {% endif %};
+                                color: {% if value > 0.5 or value < -0.4 %}white{% else %}#212529{% endif %};
+                                font-weight: {% if value > 0.6 %}700{% else %}400{% endif %};
+                                transition: all 0.2s;
+                            " title="{{ labels|list_get:forloop.parentloop.counter0 }} vs {{ labels|list_get:forloop.counter0 }}: {{ value }}">
+                                {{ value|floatformat:2 }}
+                            </td>
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 row">
+        <div class="col-md-12">
+            <div class="alert alert-light border shadow-sm">
+                <h6 class="alert-heading fw-bold"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Analysis Tips</h6>
+                <ul class="mb-0 small text-muted">
+                    <li><strong>Cluster Detection:</strong> Look for blocks of green. Participants who share green cells with each other likely belong to the same "Scenario" or mindset.</li>
+                    <li><strong>Outliers:</strong> Rows that are mostly red or white indicate participants who think differently from the group consensus.</li>
+                </ul>
+            </div>
+        </div>
     </div>
   {% endif %}
 </div>

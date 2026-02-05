@@ -7,225 +7,286 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2>Workshop 5 — Scenario Building</h2>
-            <p class="text-muted mb-0">Stage 4: Scenario Extraction, Reporting, and Analytics</p>
+            <p class="text-muted mb-0">Stage 4: Analytics Dashboard & Reporting</p>
         </div>
         <div class="btn-group">
-            <a href="{% url 'scenario_qsort' project.id %}" class="btn btn-outline-secondary">
-                ← Back to Q-Sorting
+            <a href="{% url 'scenario_correlation' project.id %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Correlation
             </a>
+
             <form method="post" class="d-inline ms-2">
                 {% csrf_token %}
+                <input type="hidden" name="mode" value="recalculate">
                 <button type="submit" class="btn btn-primary">
-                    Recalculate Scenarios
+                    <i class="bi bi-cpu"></i> Recalculate
                 </button>
             </form>
+
+            <div class="btn-group ms-2">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="mode" value="export_csv">
+                            <button type="submit" class="dropdown-item">Download CSV Data</button>
+                        </form>
+                    </li>
+                    <li><button class="dropdown-item" id="btn-pdf">Download PDF Report</button></li>
+                </ul>
+            </div>
         </div>
     </div>
 
     {% if not scenarios %}
-    <div class="alert alert-info shadow-sm">
-        No scenarios generated yet. Please click <strong>Recalculate Scenarios</strong> to process the data.
+    <div class="alert alert-info shadow-sm p-4">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-info-circle display-4 me-3"></i>
+            <div>
+                <h5>Ready to Analyze</h5>
+                <p class="mb-0">Click <strong>Recalculate</strong> to run the clustering algorithm and generate scenarios.</p>
+            </div>
+        </div>
     </div>
     {% else %}
 
-    <div id="scenarios-container" class="row g-4">
-        {% for scenario in scenarios %}
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border-0">
-                <div class="card-header bg-dark text-white fw-bold">
-                    {{ scenario.title }}
-                </div>
-                <div class="card-body">
-                    <p class="small text-secondary white-space-pre-line mb-4">{{ scenario.description }}</p>
+    <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button">
+                <i class="bi bi-list-columns"></i> Detailed Rankings
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button">
+                <i class="bi bi-graph-up"></i> Methodology Stats
+            </button>
+        </li>
+    </ul>
 
-                    <h6 class="border-bottom pb-2 mb-3 text-primary">Top Preferred Actions</h6>
-                    <ul class="list-group list-group-flush mb-4">
-                        {% for obj in scenario.top_actions_objects %}
-                            <li class="list-group-item px-0 py-2 small border-0">
-                                <span class="badge bg-primary rounded-pill me-2">{{ forloop.counter }}</span>
-                                {{ obj.text }}
-                            </li>
-                        {% endfor %}
-                    </ul>
+    <div class="tab-content" id="reportTabsContent">
 
-                    <h6 class="border-bottom pb-2 mb-3 text-secondary">Full Ranking</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle small mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Action</th>
-                                    <th class="text-end" style="width: 80px;">Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in scenario.ranking %}
-                                <tr>
-                                    <td class="text-truncate" style="max-width: 150px;" title="{{ row.text }}">
-                                        {{ row.text }}
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="d-flex align-items-center justify-content-end">
-                                            <span class="me-2 fw-bold">{{ row.score|floatformat:2 }}</span>
-                                            <div class="progress" style="width: 40px; height: 4px;">
-                                                <div class="progress-bar bg-info"
-                                                     style="width: {{ row.score|add:3|default:0|floatformat:0 }}0%">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="2" class="text-center text-muted">No ranking data available</td></tr>
+        <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+            <div class="row g-4">
+                {% for scenario in scenarios %}
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm border-top border-4 border-primary">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">{{ scenario.title }}</h5>
+                            <span class="badge bg-light text-dark border mb-3">
+                                <i class="bi bi-people"></i> {{ scenario.count }} Participants
+                            </span>
+                            <p class="small text-muted">{{ scenario.description }}</p>
+
+                            <h6 class="text-primary mt-3">Top Priorities:</h6>
+                            <ul class="list-group list-group-flush small">
+                                {% for obj in scenario.top_actions_objects %}
+                                <li class="list-group-item px-0">
+                                    <span class="fw-bold me-2">{{ forloop.counter }}.</span> {{ obj.text }}
+                                </li>
                                 {% endfor %}
-                            </tbody>
-                        </table>
+                            </ul>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
+                {% endfor %}
 
-    {% if analysis %}
-    <div class="mt-5 pt-4 border-top">
-        <h4 class="mb-4">Methodology Analytics</h4>
-
-        <div class="row g-4">
-            {% if analysis.scenario_correlation %}
-            <div class="col-lg-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body">
-                        <h6 class="card-title fw-bold">Correlation Between Scenarios</h6>
-                        <div class="table-responsive mt-3">
-                            <table class="table table-sm table-bordered small">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Scenario</th>
-                                        {% for label in analysis.scenario_correlation.labels %}
-                                            <th class="text-end">{{ label }}</th>
-                                        {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in analysis.scenario_correlation.matrix %}
-                                    <tr>
-                                        <td class="fw-bold">{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
-                                        {% for value in row %}
-                                            <td class="text-end {% if value > 0.7 %}table-success{% elif value < -0.3 %}table-danger{% endif %}">
-                                                {{ value|floatformat:3 }}
-                                            </td>
-                                        {% endfor %}
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white fw-bold">
+                            <i class="bi bi-bar-chart-fill"></i> Comparative Analysis
+                        </div>
+                        <div class="card-body">
+                            <canvas id="scenarioChart" height="100"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
+        </div>
 
-            {% if analysis.factor_analysis %}
-            <div class="col-lg-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-body">
-                        <h6 class="card-title fw-bold">Rotated Factor Loadings</h6>
-                        <p class="small text-muted mb-3">
-                            Factors (Kaiser > 1): <strong>{{ analysis.factor_analysis.n_factors }}</strong>
-                        </p>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered small text-center">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="text-start">Participant</th>
-                                        {% for _ in analysis.factor_analysis.rotated_loadings|list_get:0 %}
-                                            <th>F{{ forloop.counter }}</th>
-                                        {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in analysis.factor_analysis.rotated_loadings %}
-                                    <tr>
-                                        <td class="text-start">{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
-                                        {% for value in row %}
-                                            <td class="{% if value > 0.45 or value < -0.45 %}table-warning fw-bold{% endif %}">
-                                                {{ value|floatformat:3 }}
+        <div class="tab-pane fade" id="details" role="tabpanel">
+            <div class="row g-4">
+                {% for scenario in scenarios %}
+                <div class="col-lg-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header fw-bold text-center bg-light">
+                            {{ scenario.title }} Ranking
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 600px;">
+                                <table class="table table-sm table-hover small mb-0 table-striped">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Action</th>
+                                            <th class="text-end">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in scenario.ranking %}
+                                        <tr>
+                                            <td class="text-truncate" style="max-width: 200px;" title="{{ row.text }}">
+                                                {{ row.text }}
                                             </td>
+                                            <td class="text-end fw-bold
+                                                {% if row.score > 1 %}text-success{% elif row.score < -1 %}text-danger{% endif %}">
+                                                {{ row.score|floatformat:2 }}
+                                            </td>
+                                        </tr>
                                         {% endfor %}
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="analytics" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header fw-bold">Factor Loadings (Rotated)</div>
+                        <div class="card-body">
+                            {% if analysis.factor_analysis %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered small text-center">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="text-start">Participant</th>
+                                                {% for _ in analysis.factor_analysis.rotated_loadings|list_get:0 %}
+                                                    <th>F{{ forloop.counter }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in analysis.factor_analysis.rotated_loadings %}
+                                            <tr>
+                                                <td class="text-start">{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
+                                                {% for value in row %}
+                                                    <td class="{% if value > 0.45 %}bg-success text-white{% endif %}">
+                                                        {{ value|floatformat:2 }}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No factor analysis data available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header fw-bold">Scenario Correlation</div>
+                        <div class="card-body">
+                            {% if analysis.scenario_correlation %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered small">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th></th>
+                                                {% for label in analysis.scenario_correlation.labels %}
+                                                    <th class="text-end">{{ label }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in analysis.scenario_correlation.matrix %}
+                                            <tr>
+                                                <td class="fw-bold">{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
+                                                {% for value in row %}
+                                                    <td class="text-end {% if value > 0.7 %}text-success fw-bold{% endif %}">
+                                                        {{ value|floatformat:2 }}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No correlation data available.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
         </div>
-    </div>
-    {% endif %}
-
-    <div class="mt-5 mb-5">
-        <button id="download-pdf" class="btn btn-success">
-            Download PDF Summary
-        </button>
     </div>
     {% endif %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const btn = document.getElementById('download-pdf');
-    if (!btn) return;
-
-    btn.addEventListener('click', function () {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        let y = 20;
-
-        doc.setFontSize(16);
-        doc.text('Scenario Building Summary', 10, y);
-        y += 10;
-        doc.setFontSize(11);
-
-        const cards = document.querySelectorAll('#scenarios-container .card');
-        cards.forEach((card) => {
-            if (y > 260) { doc.addPage(); y = 20; }
-
-            // Get Title
-            const title = card.querySelector('.card-header').innerText;
-            doc.setFont(undefined, 'bold');
-            doc.text(title, 10, y);
-            y += 7;
-
-            // Get Description
-            doc.setFont(undefined, 'normal');
-            const desc = card.querySelector('.card-body p').innerText;
-            const splitDesc = doc.splitTextToSize(desc, 180);
-            doc.text(splitDesc, 10, y);
-            y += (splitDesc.length * 5) + 5;
-
-            // Get Top Actions
-            const topActions = card.querySelectorAll('ul li');
-            if(topActions.length > 0) {
-                doc.text('Top Actions:', 10, y);
-                y += 6;
-                topActions.forEach(li => {
-                    let text = li.innerText.replace(/^\d+\s*/, '').trim();
-                    doc.text('• ' + text, 15, y);
-                    y += 6;
-                });
-            }
-            y += 10;
+    // PDF Generation
+    const btnPdf = document.getElementById('btn-pdf');
+    if (btnPdf) {
+        btnPdf.addEventListener('click', function () {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text('Workshop 5 Scenario Report', 10, 10);
+            doc.save('scenarios.pdf');
         });
+    }
 
-        doc.save('scenarios.pdf');
-    });
+    // Chart.js Visualization
+    const ctx = document.getElementById('scenarioChart');
+    if (ctx) {
+        // Prepare Data from Django Template
+        // We will plot the scores of the Top 5 actions from Scenario 1 to compare across all
+        {% if scenarios %}
+            const labels = [];
+            const s1_scores = [];
+            const s2_scores = [];
+            const s3_scores = [];
+
+            // Extract top actions from Scenario 1 for comparison
+            {% for obj in scenarios.0.top_actions_objects|slice:":5" %}
+                labels.push("Action {{ obj.id }}");
+                s1_scores.push({{ obj.score }});
+
+                // Find score of this action in other scenarios
+                {% for s in scenarios %}
+                    {% if s.id == 2 %}
+                        s2_scores.push({{ s.composite_scores|dict_get:obj.id|default:0 }});
+                    {% elif s.id == 3 %}
+                        s3_scores.push({{ s.composite_scores|dict_get:obj.id|default:0 }});
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Scenario 1', data: s1_scores, backgroundColor: '#0d6efd' },
+                        { label: 'Scenario 2', data: s2_scores, backgroundColor: '#198754' },
+                        { label: 'Scenario 3', data: s3_scores, backgroundColor: '#dc3545' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        {% endif %}
+    }
 });
 </script>
-
-<style>
-    .white-space-pre-line { white-space: pre-line; }
-</style>
 {% endblock %}

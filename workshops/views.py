@@ -1003,51 +1003,35 @@ def scenario_qsort_view(request, project_id):
 def correlation_matrix_view(request, project_id):
     """
     Stage 3 - Correlation Analysis.
-    Renders participant-by-participant Pearson correlation matrix.
+    Reads strictly from JSON data to ensure deleted participants are removed.
     """
     project = get_object_or_404(Project, id=project_id, owner=request.user)
-    qsort_results = list(project.qsort_results.all().order_by("created_at"))
+    data = get_scenario_data(project)  # Source of truth
 
     if request.method == "POST":
+        # Proceed to Stage 4
         return redirect("scenario_results", project_id=project.id)
 
-    if not qsort_results:
+    # 1. Calculate Matrix on the fly
+    # This uses your existing helper function which reads from data['qsorts']
+    # Since 'save_scenario' updates this list, deletions are reflected immediately.
+    matrix_data = compute_pearson_correlation(data)
+
+    labels = matrix_data.get("labels", [])
+    matrix = matrix_data.get("matrix", [])
+
+    # 2. Check for sufficient data
+    if not matrix or len(labels) < 2:
         return render(
             request,
             "workshops/correlation_matrix.html",
             {
                 "project": project,
-                "labels": [],
-                "matrix": [],
                 "empty": True,
             },
         )
 
-    # Build participant vectors from stored action->score mappings
-    all_action_ids = set()
-    for r in qsort_results:
-        all_action_ids.update([int(k) for k in (r.sort_data or {}).keys()])
-    action_ids = sorted(all_action_ids)
-
-    labels = []
-    vectors = []
-    for r in qsort_results:
-        label = r.participant_label or r.participant_id
-        labels.append(label)
-        mapping = r.sort_data or {}
-        vec = [float(mapping.get(str(aid), 0.0)) for aid in action_ids]
-        vectors.append(vec)
-
-    # Compute correlation matrix (participants x participants)
-    n = len(vectors)
-    matrix = []
-    for i in range(n):
-        row = []
-        for j in range(n):
-            r_val = _pearson_r(vectors[i], vectors[j])
-            row.append(round(r_val, 4))
-        matrix.append(row)
-
+    # 3. Render Heatmap
     return render(
         request,
         "workshops/correlation_matrix.html",
@@ -1058,7 +1042,6 @@ def correlation_matrix_view(request, project_id):
             "empty": False,
         },
     )
-
 def _vector_from_qsort(distribution, action_ids):
     """Convert a distribution dict into a vector aligned with action_ids."""
     score_by_action = {aid: 0 for aid in action_ids}
@@ -1117,8 +1100,15 @@ def _kmeans(qsort_vectors, k=3, max_iter=25):
     return assignments
 
 
-# In views.py
+import csv
+from django.http import HttpResponse
+
+
 def run_scenario_extraction(data):
+    """
+    Advanced Clustering & Reporting Logic.
+    Now includes pre-calculated lists for easier template rendering.
+    """
     actions = data.get("actions", [])
     qsorts = data.get("qsorts", [])
 
@@ -1127,20 +1117,20 @@ def run_scenario_extraction(data):
         return data
 
     action_ids = [a["id"] for a in actions]
-
-    # 1. Master Lookup
+    # Master lookup for text
     action_lookup = {str(a["id"]): a["text"] for a in actions}
 
-    # 2. KMeans
+    # 1. Prepare Vectors
     vectors = []
     for qs in qsorts:
         dist = qs.get("distribution", {})
         vec = _vector_from_qsort(dist, action_ids)
         vectors.append(vec)
 
+    # 2. Run K-Means (k=3 is standard for Q-Methodology workshops)
     assignments = _kmeans(vectors, k=3)
 
-    # 3. Group Indices
+    # 3. Group by Cluster
     clusters = {}
     for idx, cluster_id in enumerate(assignments):
         clusters.setdefault(cluster_id, []).append(idx)
@@ -1152,65 +1142,90 @@ def run_scenario_extraction(data):
         if not q_indices:
             continue
 
-        # 4. Compute Scores
+        # 4. Calculate Composite Scores (Average of the cluster)
         composite = {str(aid): 0.0 for aid in action_ids}
         for aid_idx, aid in enumerate(action_ids):
             scores = [vectors[i][aid_idx] for i in q_indices]
             composite[str(aid)] = sum(scores) / len(scores)
 
-        # 5. Build Ranking List
+        # 5. Rank Actions (High to Low)
         sorted_ids = sorted(action_ids, key=lambda x: composite[str(x)], reverse=True)
 
         ranking_list = []
         for aid in sorted_ids:
-            clean_text = action_lookup.get(str(aid), f"Action {aid}")
-            score_val = composite[str(aid)]
             ranking_list.append({
                 'id': aid,
-                'text': clean_text,
-                'score': score_val
+                'text': action_lookup.get(str(aid), f"Action {aid}"),
+                'score': composite[str(aid)]
             })
 
-        top_3_objects = ranking_list[:3]
+        # 6. Extract Top 3 for Summary
+        top_3 = ranking_list[:3]
 
-        # *** FIX FOR DUPLICATION ***
-        # Instead of listing the actions here, we use a generic description.
-        description = (
-            f"Scenario {scenario_counter} represents a distinct perspective within the group. "
-            "The participants in this cluster prioritized the actions listed below."
-        )
+        # 7. Generate Narrative Description
+        desc = (f"Scenario {scenario_counter} represents {len(q_indices)} participant(s). "
+                f"They prioritize: '{top_3[0]['text']}' and '{top_3[1]['text']}'.")
 
         scenarios.append({
             "id": scenario_counter,
             "title": f"Scenario {scenario_counter}",
-            "description": description,
-            "top_actions_objects": top_3_objects,
+            "description": desc,
+            "count": len(q_indices),
+            "top_actions_objects": top_3,
             "ranking": ranking_list,
             "composite_scores": composite,
         })
-
         scenario_counter += 1
 
     data["scenarios"] = scenarios
     data["last_clustered_at"] = datetime.utcnow().isoformat()
 
-    # Analytics
+    # Run Analytics
     analysis = data.get("analysis", {})
     analysis["scenario_correlation"] = compute_scenario_correlation(data)
     analysis["factor_analysis"] = compute_factor_loadings(data)
     data["analysis"] = analysis
 
     return data
+
+
 @login_required
 def scenario_results_view(request, project_id):
     project = get_object_or_404(Project, id=project_id, owner=request.user)
     data = get_scenario_data(project)
 
+    # HANDLE POST ACTIONS
     if request.method == "POST":
-        # Recalculate everything with the new logic
-        data = run_scenario_extraction(data)
-        save_scenario_data(project, data)
-        return redirect("scenario_results", project_id=project.id)
+        mode = request.POST.get("mode")
+
+        if mode == "recalculate":
+            data = run_scenario_extraction(data)
+            save_scenario_data(project, data)
+            return redirect("scenario_results", project_id=project.id)
+
+        elif mode == "export_csv":
+            # --- CSV EXPORT ENGINE ---
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="project_{project.id}_scenarios.csv"'
+
+            writer = csv.writer(response)
+            scenarios = data.get("scenarios", [])
+
+            # Header
+            header = ["Action ID", "Action Text"] + [s["title"] for s in scenarios]
+            writer.writerow(header)
+
+            # Rows
+            actions = data.get("actions", [])
+            for action in actions:
+                row = [action["id"], action["text"]]
+                for s in scenarios:
+                    # Get score safely
+                    score = s.get("composite_scores", {}).get(str(action["id"]), 0)
+                    row.append(f"{score:.2f}")
+                writer.writerow(row)
+
+            return response
 
     actions = data.get("actions", [])
     scenarios = data.get("scenarios", [])
@@ -1225,8 +1240,6 @@ def scenario_results_view(request, project_id):
             "analysis": data.get("analysis", {}),
         },
     )
-
-
 @require_POST
 @login_required
 def save_scenario(request, project_id):
