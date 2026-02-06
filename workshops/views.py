@@ -844,22 +844,30 @@ def compute_scenario_correlation(data):
         return {"labels": [], "matrix": []}
 
     action_ids = [a["id"] for a in actions]
-    scenario_ids = [s.get("id") for s in scenarios]
+    scenario_titles = [s.get("title") for s in scenarios]
 
     # Build matrix: rows=actions, cols=scenarios (composite scores)
     scenario_vectors = []
     for s in scenarios:
         composite = s.get("composite_scores", {})
-        vec = [float(composite.get(aid, 0.0)) for aid in action_ids]
+        # FIX: Ensure we look up using STRING keys (str(aid))
+        vec = [float(composite.get(str(aid), 0.0)) for aid in action_ids]
         scenario_vectors.append(vec)
 
-    matrix = np.array(scenario_vectors, dtype=float).T
-    corr = _safe_corrcoef(matrix, rowvar=False)
+    # Transpose because corrcoef expects rows=variables(scenarios), cols=observations(actions)
+    # But wait, numpy.corrcoef treats rows as variables.
+    # We want correlation BETWEEN scenarios. So Scenarios should be the rows.
+    # scenario_vectors is currently [Scenario1_vec, Scenario2_vec]. This is correct for np.corrcoef.
+
+    matrix = np.array(scenario_vectors, dtype=float)
+
+    # Use _safe_corrcoef (your existing helper)
+    corr = _safe_corrcoef(matrix, rowvar=True)
+
     return {
-        "labels": [f"Scenario {sid}" for sid in scenario_ids],
+        "labels": scenario_titles,
         "matrix": corr.round(4).tolist() if corr is not None else [],
     }
-
 
 def compute_factor_loadings(data):
     """

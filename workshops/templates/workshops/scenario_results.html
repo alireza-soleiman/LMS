@@ -42,31 +42,20 @@
 
     {% if not scenarios %}
     <div class="alert alert-info shadow-sm p-4">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-info-circle display-4 me-3"></i>
-            <div>
-                <h5>Ready to Analyze</h5>
-                <p class="mb-0">Click <strong>Recalculate</strong> to run the clustering algorithm and generate scenarios.</p>
-            </div>
-        </div>
+        <h5>Ready to Analyze</h5>
+        <p class="mb-0">Click <strong>Recalculate</strong> to generate scenarios.</p>
     </div>
     {% else %}
 
     <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button">
-                <i class="bi bi-speedometer2"></i> Dashboard
-            </button>
+        <li class="nav-item">
+            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button">Dashboard</button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button">
-                <i class="bi bi-list-columns"></i> Detailed Rankings
-            </button>
+        <li class="nav-item">
+            <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button">Detailed Rankings</button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button">
-                <i class="bi bi-graph-up"></i> Methodology Stats
-            </button>
+        <li class="nav-item">
+            <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button">Methodology Stats</button>
         </li>
     </ul>
 
@@ -100,10 +89,45 @@
                 <div class="col-12">
                     <div class="card shadow-sm">
                         <div class="card-header bg-white fw-bold">
-                            <i class="bi bi-bar-chart-fill"></i> Comparative Analysis
+                            <i class="bi bi-ui-checks-grid"></i> Comparative Priorities (Top Actions of Scenario 1)
                         </div>
                         <div class="card-body">
-                            <canvas id="scenarioChart" height="100"></canvas>
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40%;">Action</th>
+                                            {% for s in scenarios %}
+                                                <th class="text-center">{{ s.title }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for obj in scenarios.0.top_actions_objects|slice:":5" %}
+                                        <tr>
+                                            <td class="fw-bold text-secondary">{{ obj.text }}</td>
+                                            {% for s in scenarios %}
+                                                {% with str_id=obj.id|stringformat:"s" %}
+                                                {% with score=s.composite_scores|dict_get:str_id|default:0 %}
+                                                <td class="text-center">
+                                                    <div class="d-flex flex-column align-items-center">
+                                                        <span class="small fw-bold mb-1">{{ score|floatformat:2 }}</span>
+                                                        <div class="progress" style="width: 100px; height: 10px; background-color: #e9ecef;">
+                                                            <div class="progress-bar {% if score >= 0 %}bg-success{% else %}bg-danger{% endif %}"
+                                                                 role="progressbar"
+                                                                 style="width: {{ score|add:3|div:6|mul:100|floatformat:0 }}%;">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {% endwith %}
+                                                {% endwith %}
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -130,11 +154,8 @@
                                     <tbody>
                                         {% for row in scenario.ranking %}
                                         <tr>
-                                            <td class="text-truncate" style="max-width: 200px;" title="{{ row.text }}">
-                                                {{ row.text }}
-                                            </td>
-                                            <td class="text-end fw-bold
-                                                {% if row.score > 1 %}text-success{% elif row.score < -1 %}text-danger{% endif %}">
+                                            <td>{{ row.text }}</td>
+                                            <td class="text-end fw-bold {% if row.score > 0 %}text-success{% else %}text-danger{% endif %}">
                                                 {{ row.score|floatformat:2 }}
                                             </td>
                                         </tr>
@@ -151,6 +172,7 @@
 
         <div class="tab-pane fade" id="analytics" role="tabpanel">
             <div class="row g-4">
+
                 <div class="col-md-6">
                     <div class="card shadow-sm h-100">
                         <div class="card-header fw-bold">Factor Loadings (Rotated)</div>
@@ -169,9 +191,10 @@
                                         <tbody>
                                             {% for row in analysis.factor_analysis.rotated_loadings %}
                                             <tr>
-                                                <td class="text-start">{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
+                                                <td class="text-start fw-bold text-muted">{{ analysis.factor_analysis.participants|list_get:forloop.counter0 }}</td>
                                                 {% for value in row %}
-                                                    <td class="{% if value > 0.45 %}bg-success text-white{% endif %}">
+                                                    {# COLOR LOGIC: Green background if loading > 0.45 #}
+                                                    <td class="{% if value > 0.45 %}bg-success text-white fw-bold{% endif %}">
                                                         {{ value|floatformat:2 }}
                                                     </td>
                                                 {% endfor %}
@@ -193,7 +216,7 @@
                         <div class="card-body">
                             {% if analysis.scenario_correlation %}
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-bordered small">
+                                    <table class="table table-sm table-bordered small text-center">
                                         <thead class="table-light">
                                             <tr>
                                                 <th></th>
@@ -205,9 +228,13 @@
                                         <tbody>
                                             {% for row in analysis.scenario_correlation.matrix %}
                                             <tr>
-                                                <td class="fw-bold">{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
+                                                <td class="fw-bold text-start">{{ analysis.scenario_correlation.labels|list_get:forloop.counter0 }}</td>
                                                 {% for value in row %}
-                                                    <td class="text-end {% if value > 0.7 %}text-success fw-bold{% endif %}">
+                                                    {# COLOR LOGIC: Green Text for > 0.7, Red for < -0.5 #}
+                                                    <td class="text-end
+                                                        {% if value > 0.7 %}text-success fw-bold
+                                                        {% elif value < -0.5 %}text-danger fw-bold
+                                                        {% endif %}">
                                                         {{ value|floatformat:2 }}
                                                     </td>
                                                 {% endfor %}
@@ -228,64 +255,23 @@
     {% endif %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // PDF Generation
     const btnPdf = document.getElementById('btn-pdf');
     if (btnPdf) {
         btnPdf.addEventListener('click', function () {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             doc.text('Workshop 5 Scenario Report', 10, 10);
+
+            let y = 20;
+            document.querySelectorAll('#dashboard .card-title').forEach(t => {
+                doc.text(t.innerText, 10, y);
+                y += 10;
+            });
             doc.save('scenarios.pdf');
         });
-    }
-
-    // Chart.js Visualization
-    const ctx = document.getElementById('scenarioChart');
-    if (ctx) {
-        // Prepare Data from Django Template
-        // We will plot the scores of the Top 5 actions from Scenario 1 to compare across all
-        {% if scenarios %}
-            const labels = [];
-            const s1_scores = [];
-            const s2_scores = [];
-            const s3_scores = [];
-
-            // Extract top actions from Scenario 1 for comparison
-            {% for obj in scenarios.0.top_actions_objects|slice:":5" %}
-                labels.push("Action {{ obj.id }}");
-                s1_scores.push({{ obj.score }});
-
-                // Find score of this action in other scenarios
-                {% for s in scenarios %}
-                    {% if s.id == 2 %}
-                        s2_scores.push({{ s.composite_scores|dict_get:obj.id|default:0 }});
-                    {% elif s.id == 3 %}
-                        s3_scores.push({{ s.composite_scores|dict_get:obj.id|default:0 }});
-                    {% endif %}
-                {% endfor %}
-            {% endfor %}
-
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Scenario 1', data: s1_scores, backgroundColor: '#0d6efd' },
-                        { label: 'Scenario 2', data: s2_scores, backgroundColor: '#198754' },
-                        { label: 'Scenario 3', data: s3_scores, backgroundColor: '#dc3545' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true } }
-                }
-            });
-        {% endif %}
     }
 });
 </script>
