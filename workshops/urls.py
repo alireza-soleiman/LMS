@@ -54,6 +54,10 @@ urlpatterns = [
     path("project/<int:project_id>/scenario/results/", views.scenario_results_view, name="scenario_results"),
     path("project/<int:project_id>/scenario/save/", views.save_scenario, name="save_scenario"),
 
+    # Workshop 8 — Final Review & Export
+    path("project/<int:project_id>/final-review/", views.final_review_view, name="final_review"),
+    path("project/<int:project_id>/final-review/pdf/", views.final_review_pdf, name="final_review_pdf"),
+
     # Project Creation
     path("project/create/", views.create_project_view, name="create_project"),
 
