@@ -9,6 +9,7 @@ import numpy as np
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.utils import timezone
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1446,3 +1447,147 @@ def save_scenario(request, project_id):
         return JsonResponse({"status": "ok"})
 
     return HttpResponseBadRequest("Unknown mode")
+
+
+
+# -------------------------
+# workshop 8
+# -------------------------
+
+@login_required
+def final_review_view(request, project_id):
+    project = _get_project_for_user(request, project_id)
+
+    overview = project.overview or {}
+    sdg_ids = ""
+    try:
+        sdg_ids = (overview.get("D2_SDGS", {}) or {}).get("text", "") if isinstance(overview.get("D2_SDGS"), dict) else ""
+    except Exception:
+        sdg_ids = ""
+
+    # Workshop 3 indicators
+    selected_indicators = project.indicators.filter(accepted=True).order_by("order", "id")
+    ranked = bool(getattr(project, "indicator_ranking_order", None))
+    top_weights = selected_indicators.exclude(weight__isnull=True).order_by("-weight")[:10]
+
+    # SWOT
+    swot_items = project.swot_items.all().order_by("category", "created_at", "id") if hasattr(project, "swot_items") else []
+    swot_by_cat = {"S": [], "W": [], "O": [], "T": []}
+    for item in swot_items:
+        swot_by_cat.setdefault(item.category, []).append(item)
+
+    # Scenario JSON summary
+    scenario = project.scenario_data or {}
+    actions_count = len(scenario.get("actions", []) or [])
+    qsorts_count = len(scenario.get("qsorts", []) or [])
+    scenarios_count = len(scenario.get("scenarios", []) or [])
+
+    context = {
+        "project": project,
+        "overview": overview,
+        "sdg_ids": sdg_ids,
+        "stakeholders_count": project.stakeholders.count() if hasattr(project, "stakeholders") else 0,
+        "problems_count": project.problems.count() if hasattr(project, "problems") else 0,
+        "objectives_count": project.objectives.count() if hasattr(project, "objectives") else 0,
+        "selected_indicators": selected_indicators,
+        "ranked": ranked,
+        "top_weights": top_weights,
+        "swot_by_cat": swot_by_cat,
+        "scenario_summary": {
+            "actions": actions_count,
+            "qsorts": qsorts_count,
+            "scenarios": scenarios_count,
+        },
+        "generated_at": timezone.now(),
+    }
+    return render(request, "workshops/final_review.html", context)
+
+
+@login_required
+def final_review_pdf(request, project_id):
+    """
+    Server-side PDF export using reportlab.
+    If you don't have reportlab installed locally, install it:
+      pip install reportlab
+    """
+    project = _get_project_for_user(request, project_id)
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import mm
+    except Exception:
+        return HttpResponse("reportlab is not installed. Run: pip install reportlab", status=500)
+
+    overview = project.overview or {}
+    sdg_ids = ""
+    if isinstance(overview.get("D2_SDGS"), dict):
+        sdg_ids = (overview.get("D2_SDGS") or {}).get("text", "")
+
+    def box_text(key):
+        v = overview.get(key)
+        if isinstance(v, dict):
+            return (v.get("text") or "").strip()
+        return ""
+
+    resp = HttpResponse(content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="Project_Portfolio_{project.id}.pdf"'
+
+    c = canvas.Canvas(resp, pagesize=A4)
+    w, h = A4
+    x = 18 * mm
+    y = h - 18 * mm
+
+    def line(txt, size=11, dy=6):
+        nonlocal y
+        c.setFont("Helvetica", size)
+        for part in (txt or "—").split("\n"):
+            c.drawString(x, y, part[:130])
+            y -= dy * mm
+            if y < 20 * mm:
+                c.showPage()
+                y = h - 18 * mm
+                c.setFont("Helvetica", size)
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(x, y, "Project Portfolio — Workshop 8")
+    y -= 8 * mm
+    c.setFont("Helvetica", 11)
+    c.drawString(x, y, f"Project: {project.title}")
+    y -= 6 * mm
+    c.drawString(x, y, f"Generated: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+    y -= 10 * mm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x, y, "Workshop 1 — Idea Canvas")
+    y -= 6 * mm
+    line(f"A1 Problem:\n{box_text('A1')}")
+    line(f"B1 Solution:\n{box_text('B1')}")
+    if sdg_ids:
+        line(f"Selected SDGs: {sdg_ids}")
+    y -= 2 * mm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x, y, "Workshop 2 — PCM Summary")
+    y -= 6 * mm
+    line(f"Stakeholders: {project.stakeholders.count() if hasattr(project, 'stakeholders') else 0}")
+    line(f"Problems: {project.problems.count() if hasattr(project, 'problems') else 0}")
+    line(f"Objectives: {project.objectives.count() if hasattr(project, 'objectives') else 0}")
+    y -= 2 * mm
+
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(x, y, "Workshop 3 — Indicators")
+    y -= 6 * mm
+    selected = project.indicators.filter(accepted=True).order_by("order", "id")
+    line(f"Selected indicators: {selected.count()}")
+    ranked = bool(getattr(project, "indicator_ranking_order", None))
+    line(f"Ranking computed: {'Yes' if ranked else 'No'}")
+    top = selected.exclude(weight__isnull=True).order_by("-weight")[:8]
+    if top.exists():
+        line("Top weights:")
+        for ind in top:
+            line(f" - {ind.name}  (w={ind.weight:.4f})", size=10, dy=5)
+
+    c.showPage()
+    c.save()
+    return resp
