@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Final Review — {{ project.title }}{% endblock %}
+{% block content %}
+
+<style>
+  body { background:#f8fafc; font-family:"Inter", sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .card { border:0; border-radius: 1rem; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+  .muted { color:#64748b; }
+  .small-link { text-decoration:none; font-weight:600; }
+</style>
+
+<div class="container py-4 wrap">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+    <div>
+      <h2 class="mb-1">✅ Workshop 8 — Final Review & Export</h2>
+      <div class="muted">Project portfolio summary for professor review.</div>
+      <div class="muted small">Generated: {{ generated_at }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'workshop_list' project.id %}">← Back to Project Home</a>
+      <a class="btn btn-primary" href="{% url 'final_review_pdf' project.id %}">📄 Download Portfolio PDF</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- Workshop 1 -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Workshop 1 — Idea Canvas</h5>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'project_overview' project.id %}">Open</a>
+        </div>
+        <div class="small"><strong>A1 (Problem):</strong> {{ overview.A1.text|default:"—" }}</div>
+        <div class="small mt-2"><strong>B1 (Solution):</strong> {{ overview.B1.text|default:"—" }}</div>
+        <div class="small mt-2"><strong>Selected SDGs:</strong> {{ sdg_ids|default:"—" }}</div>
+      </div>
+    </div>
+
+    <!-- Workshop 2 -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Workshop 2 — PCM</h5>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'stakeholder_list' project.id %}">Open</a>
+        </div>
+
+        <div class="small">
+          Stakeholders: <strong>{{ stakeholders_count }}</strong>
+          <a class="small-link ms-2" href="{% url 'download_stakeholders' project.id %}">Download CSV</a>
+        </div>
+
+        <div class="small mt-1">
+          Problems: <strong>{{ problems_count }}</strong>
+          <a class="small-link ms-2" href="{% url 'problem_tree' project.id %}">View</a>
+        </div>
+
+        <div class="small mt-1">
+          Objectives: <strong>{{ objectives_count }}</strong>
+          <a class="small-link ms-2" href="{% url 'objective_tree' project.id %}">View</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workshop 3 -->
+    <div class="col-md-12">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <h5 class="mb-0">Workshop 3 — Indicators</h5>
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'indicator_selection' project.id %}">Selection</a>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'indicator_ranking' project.id %}">Ranking</a>
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'download_indicators_csv' project.id %}">Download CSV</a>
+          </div>
+        </div>
+
+        <div class="small muted mb-2">
+          Selected indicators: {{ selected_indicators.count }} • Ranking computed: {% if ranked %}Yes{% else %}No{% endif %}
+        </div>
+
+        {% if top_weights %}
+          <div class="small"><strong>Top weights:</strong></div>
+          <ul class="small mb-0">
+            {% for ind in top_weights %}
+              <li>{{ ind.name }} — w={{ ind.weight|floatformat:4 }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="small muted">No weights computed yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Workshop 4 -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Workshop 4 — SWOT</h5>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'swot_analysis' project.id %}">Open</a>
+        </div>
+        <div class="small">
+          S: {{ swot_by_cat.S|length }} • W: {{ swot_by_cat.W|length }} • O: {{ swot_by_cat.O|length }} • T: {{ swot_by_cat.T|length }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Workshop 5 -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Workshop 5 — Scenario & Q</h5>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'scenario_building' project.id %}">Open</a>
+        </div>
+        <div class="small">
+          Actions: {{ scenario_summary.actions }} • Q-sorts: {{ scenario_summary.qsorts }} • Scenarios: {{ scenario_summary.scenarios }}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
