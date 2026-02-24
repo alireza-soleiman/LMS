@@ -1,440 +1,613 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Stakeholders for {{ project.title }}</title>
+{% extends "base.html" %}
+{% block title %}Workshop 2.1 — Stakeholders — {{ project.title }}{% endblock %}
+{% block content %}
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  body { background: #f8fafc; font-family: "Inter", sans-serif; }
 
-    <style>
-        /* === FIX for dropdowns cut off inside table === */
-.table-responsive {
-  overflow: visible !important;
+  .card {
+    border: none;
+    border-radius: 1rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  }
+  .muted { color:#64748b; }
 
+  /* Tooltip */
+  .d3-tooltip {
+    position: absolute;
+    text-align: center;
+    padding: 6px 10px;
+    font: 12px sans-serif;
+    background: #111827;
+    color: #fff;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 2000;
+  }
+
+  /* Table dropdown overflow fix */
+  .table-responsive { overflow: visible !important; }
+  .dropdown-menu { z-index: 1055 !important; position: absolute !important; }
+
+  /* Tag pills */
+  .color-tag { font-size: 0.9rem; font-weight: 500; padding: 0.3em 0.75em; border-radius: 1em; border: 1px solid; cursor: pointer; display: inline-block; }
+  .tag-select-btn { width: 100%; text-align: left; }
+  .tag-default { color: #6c757d; background-color: #f8f9fa; border-color: #dee2e6; }
+  .dropdown-item .tag-default { border: none; }
+
+  /* Level colors */
+  .level-Local { color: #005a9c; background-color: #e6f0ff; border-color: #b3d1ff; }
+  .level-Provincial { color: #00642e; background-color: #e6fff2; border-color: #b3ffda; }
+  .level-Regional { color: #006363; background-color: #e6ffff; border-color: #b3ffff; }
+  .level-National { color: #5a0063; background-color: #f5e6ff; border-color: #e2b3ff; }
+  .level-International { color: #634f00; background-color: #fffde6; border-color: #fffab3; }
+
+  /* Typology colors */
+  .typology-Political { color: #613500; background-color: #fff2e6; border-color: #ffdab3; }
+  .typology-Bureaucratic { color: #630000; background-color: #ffe6e6; border-color: #ffb3b3; }
+  .typology-Special { color: #63005f; background-color: #ffe6fd; border-color: #ffb3fa; }
+  .typology-General { color: #2a0063; background-color: #eee6ff; border-color: #d5b3ff; }
+  .typology-Experts { color: #002d63; background-color: #e6ebff; border-color: #b3c3ff; }
+
+  /* Resources colors */
+  .resources-Political { color: #3b5249; background-color: #dfebe7; border-color: #c8d8d3; }
+  .resources-Economic { color: #4a523b; background-color: #e8ebdf; border-color: #d4d8c8; }
+  .resources-Legal { color: #52473b; background-color: #ebe7df; border-color: #d8d3c8; }
+  .resources-Cognitive { color: #3b3c52; background-color: #dfe0eb; border-color: #c8c9d8; }
+
+  /* Sliders */
+  .range-slider-container { display: flex; flex-direction: column; gap: 4px; }
+  .value-label { font-weight: bold; font-family: monospace; width: 32px; text-align: right; }
+
+  .print-hide { }
+  .table-is-printing .dropdown-toggle::after { display:none !important; }
+  .table-is-printing .print-hide { display:none !important; }
+
+  /* Make the table feel bigger and easier to read */
+#stakeholder-table th:first-child,
+#stakeholder-table td:first-child {
+  width: 320px;
+  min-width: 320px;
+  max-width: 420px;
+  white-space: normal;   /* allow wrap */
+  word-break: break-word;
 }
 
-.dropdown-menu {
-  z-index: 1055 !important;
-  position: absolute !important;
-  transform: translate3d(0, 0, 0);
+/* Let the table breathe */
+#stakeholder-table td,
+#stakeholder-table th {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
 }
-        .d3-tooltip {
-            position: absolute;
-            text-align: center;
-            padding: 6px 10px;
-            font: 12px sans-serif;
-            background: #333;
-            color: #fff;
-            border: 0px;
-            border-radius: 8px;
-            pointer-events: none; /* Lets mouse events pass through */
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        /* General Styles */
-        body { background-color: #f8f9fa; }
-        .axis-label { font-size: 14px; font-weight: bold; text-anchor: middle; }
-        .stakeholder-node text { font-size: 12px; }
-        .stakeholder-node circle { stroke: rgba(0,0,0,0.7); stroke-width: 1.5px; }
-        .quadrant-label { font-size: 1.1em; font-weight: bold; fill: rgba(0, 0, 0, 0.5); }
-        .table-is-printing .dropdown-toggle::after { display: none !important; }
-        .table-is-printing .print-hide {
-            display: none !important;
-        }
 
-        /* Academic Tag/Pill Styles */
-        .color-tag { font-size: 0.9rem; font-weight: 500; padding: 0.3em 0.75em; border-radius: 1em; border: 1px solid; cursor: pointer; display: inline-block; }
-        .tag-select-btn { width: 100%; text-align: left; }
-        .tag-default { color: #6c757d; background-color: #f8f9fa; border-color: #dee2e6; }
-        .dropdown-item .tag-default { border: none; }
-        /* Level Colors */
-        .level-Local { color: #005a9c; background-color: #e6f0ff; border-color: #b3d1ff; }
-        .level-Provincial { color: #00642e; background-color: #e6fff2; border-color: #b3ffda; }
-        .level-Regional { color: #006363; background-color: #e6ffff; border-color: #b3ffff; }
-        .level-National { color: #5a0063; background-color: #f5e6ff; border-color: #e2b3ff; }
-        .level-International { color: #634f00; background-color: #fffde6; border-color: #fffab3; }
-        /* Typology Colors */
-        .typology-Political { color: #613500; background-color: #fff2e6; border-color: #ffdab3; }
-        .typology-Bureaucratic { color: #630000; background-color: #ffe6e6; border-color: #ffb3b3; }
-        .typology-Special { color: #63005f; background-color: #ffe6fd; border-color: #ffb3fa; }
-        .typology-General { color: #2a0063; background-color: #eee6ff; border-color: #d5b3ff; }
-        .typology-Experts { color: #002d63; background-color: #e6ebff; border-color: #b3c3ff; }
-        /* Resources Colors */
-        .resources-Political { color: #3b5249; background-color: #dfebe7; border-color: #c8d8d3; }
-        .resources-Economic { color: #4a523b; background-color: #e8ebdf; border-color: #d4d8c8; }
-        .resources-Legal { color: #52473b; background-color: #ebe7df; border-color: #d8d3c8; }
-        .resources-Cognitive { color: #3b3c52; background-color: #dfe0eb; border-color: #c8c9d8; }
+/* Sticky header when scrolling long lists */
+#stakeholder-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+</style>
 
-        /* CSS for the Power/Interest Sliders */
-        .range-slider-container { display: flex; align-items: center; gap: 10px; min-width: 150px; }
-        .range-slider-container input[type="range"] { flex-grow: 1; }
-        .range-slider-container .value-label { font-weight: bold; font-family: monospace; width: 30px; text-align: right; }
-    </style>
-</head>
-<body class="bg-light">
-    <div class="container-fluid my-4">
-        <div class="row">
-            <div class="col-md-8">
-                <div class="p-4 mb-4 bg-white rounded-3 shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                          <div>
-                            <h1 class="display-5 fw-bold mb-1">Stakeholder Analysis</h1>
-                            <p class="fs-5 mb-0">Use the form to add new stakeholders. They will appear in the table below.</p>
-                          </div>
-                          <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
-                            ← Back to Workshops
-                          </a>
-                        </div>
-                    </div>
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+    <div>
+      <h2 class="mb-1">Workshop 2.1 — Stakeholder Analysis</h2>
+      <div class="muted">
+        Add stakeholders, then classify them (Level/Typology/Resources) and adjust Power/Interest.
+        The matrix updates live as you edit.
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary">← Back to Project Home</a>
 
-                <div class="card shadow-sm">
-                    <div class="card-header"><h2 class="h5 mb-0">Power/Interest Matrix: {{ project.title }}</h2></div>
-                    <div class="card-body">
-                        <div id="d3-matrix-container" class="w-100"></div>
-                    </div>
-                </div>
+      {# Next workshop: enable once at least 1 stakeholder exists #}
+      {% if stakeholders|length > 0 %}
+        <a href="{% url 'problem_tree' project.id %}" class="btn btn-primary">Next: Problem Tree →</a>
+      {% else %}
+        <a class="btn btn-primary disabled" href="#" tabindex="-1">Next: Problem Tree →</a>
+      {% endif %}
+    </div>
+  </div>
 
-                <div class="card shadow-sm mt-4">
-                    <div class="card-header"><h2 class="h5 mb-0">Stakeholder Details</h2></div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover mb-0 align-middle" id="stakeholder-table">
-                                <thead class="table-dark">
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Level</th>
-                                            <th>Typology</th>
-                                            <th>Resource</th>
-                                            <th class="print-hide">Actions</th> </tr>
-                                        </tr>
-                                </thead>
-                                <tbody>
-                                    {% for s in stakeholders %}
-                                    <tr>
-                                        <td>{{ s.name }}</td>
-
-                                        <td>
-                                            <div class="dropdown">
-                                                <button class="color-tag tag-select-btn dropdown-toggle
-                                                    {% if s.level %}level-{{ s.level }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="level-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
-                                                    {{ s.get_level_display|default:"Select..." }}
-                                                </button>
-                                                <ul class="dropdown-menu" aria-labelledby="level-{{s.id}}">
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'level', 'Local')"><span class="color-tag level-Local">Local</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'level', 'Provincial')"><span class="color-tag level-Provincial">Provincial</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'level', 'Regional')"><span class="color-tag level-Regional">Regional</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'level', 'National')"><span class="color-tag level-National">National</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'level', 'International')"><span class="color-tag level-International">International</span></a></li>
-                                                </ul>
-                                            </div>
-                                        </td>
-
-                                        <td>
-                                            <div class="dropdown">
-                                                <button class="color-tag tag-select-btn dropdown-toggle
-                                                    {% if s.typology %}typology-{{ s.typology }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="typology-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
-                                                    {{ s.get_typology_display|default:"Select..." }}
-                                                </button>
-                                                <ul class="dropdown-menu" aria-labelledby="typology-{{s.id}}">
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'typology', 'Political')"><span class="color-tag typology-Political">Political actors</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'typology', 'Bureaucratic')"><span class="color-tag typology-Bureaucratic">Bureaucratic actors</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'typology', 'Special')"><span class="color-tag typology-Special">Special interests</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'typology', 'General')"><span class="color-tag typology-General">General interests</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'typology', 'Experts')"><span class="color-tag typology-Experts">Experts</span></a></li>
-                                                </ul>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="dropdown">
-                                                <button class="color-tag tag-select-btn dropdown-toggle
-                                                    {% if s.resources %}resources-{{ s.resources }}{% else %}tag-default{% endif %}"
-                                                    type="button" id="resources-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
-                                                    {{ s.get_resources_display|default:"Select..." }}
-                                                </button>
-                                                <ul class="dropdown-menu" aria-labelledby="resources-{{s.id}}">
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Political')"><span class="color-tag resources-Political">Political</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Economic')"><span class="color-tag resources-Economic">Economic</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Legal')"><span class="color-tag resources-Legal">Legal</span></a></li>
-                                                    <li><a class="dropdown-item" href="#" onclick="updateStakeholder(event, '{{ s.id }}', 'resources', 'Cognitive')"><span class="color-tag resources-Cognitive">Cognitive</span></a></li>
-                                                </ul>
-                                            </div>
-                                        </td>
-                                        <td class="print-hide">
-                                                <form action="{% url 'delete_stakeholder' s.id %}" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this stakeholder?');">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                                </form>
-                                            </td>
-                                                                                </tr>
-                                    {% empty %}
-                                    <tr><td colspan="6" class="text-center p-4">No stakeholders added yet.</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-4">
-                <div class="card shadow-sm">
-                    <div class="card-header"><h2 class="h5 mb-0">Add New Stakeholder</h2></div>
-                    <div class="card-body">
-                        <form method="post">
-                            {% csrf_token %}
-                            {{ form.as_p }}
-                            <button type="submit" class="btn btn-primary w-100 mt-3">Add Stakeholder</button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="card shadow-sm mt-4">
-        <div class="card-header"><h2 class="h5 mb-0">Modify Power & Interest</h2></div>
-        <div class="card-body">
-            <p>Drag the sliders to update stakeholder power/interest. The matrix will update in real-time.</p>
-             <ul class="list-group list-group-flush">
-
-                {% for s in stakeholders %}
-                <li class="list-group-item py-3">
-                    <strong class="d-block mb-2">{{ s.name }}</strong>
-
-                    <div class="range-slider-container">
-                        <label for="interest-slider-{{s.id}}" class="form-label small mb-0">Interest</label>
-                        <div class="d-flex align-items-center">
-                            <input type="range" class="form-range" min="0" max="100"
-                                   value="{{ s.interest }}"
-                                   id="interest-slider-{{s.id}}"
-                                   oninput="updateSliderLabel(this)"
-                                   onchange="updateStakeholderValue(this, '{{ s.id }}', 'interest')">
-                            <span class="value-label" id="interest-slider-{{s.id}}-label">{{ s.interest }}</span>
-                        </div>
-                    </div>
-
-                    <div class="range-slider-container mt-2">
-                        <label for="power-slider-{{s.id}}" class="form-label small mb-0">Power</label>
-                        <div class="d-flex align-items-center">
-                            <input type="range" class="form-range" min="0" max="100"
-                                   value="{{ s.power }}"
-                                   id="power-slider-{{s.id}}"
-                                   oninput="updateSliderLabel(this)"
-                                   onchange="updateStakeholderValue(this, '{{ s.id }}', 'power')">
-                            <span class="value-label" id="power-slider-{{s.id}}-label">{{ s.power }}</span>
-                        </div>
-                    </div>
-                </li>
-                {% empty %}
-                <li class="list-group-item text-muted">No stakeholders to modify.</li>
-                {% endfor %}
-            </ul>
+  <div class="alert alert-info">
+    <div class="fw-semibold mb-1">What to do in this workshop</div>
+    <div class="small">
+      1) Add your main stakeholders (aim for 6–12).<br>
+      2) Use the table to assign <strong>Level</strong>, <strong>Typology</strong>, and <strong>Resources</strong>.<br>
+      3) Use the sliders to set <strong>Interest</strong> and <strong>Power</strong>. Stakeholders will move in the matrix automatically.
+    </div>
+  </div>
+<div class="card p-3 mb-3">
+  <div class="d-flex justify-content-between flex-wrap gap-2">
+    <div><strong>Total stakeholders:</strong> {{ stakeholders|length }}</div>
+    <div class="muted">
+      Tip: Aim for 6–12 stakeholders before moving on.
+    </div>
+  </div>
+</div>
+  <div class="row g-3">
+    <!-- LEFT: Matrix + Table -->
+    <div class="col-lg-8">
+      <div class="card p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Power/Interest Matrix</h5>
+          <span class="muted small">{{ project.title }}</span>
         </div>
-
-                <div class="card shadow-sm mt-4">
-                    <div class="card-header"><h2 class="h5 mb-0">Actions</h2></div>
-                    <div class="card-body d-grid gap-2">
-                        <button type="button" onclick="downloadMatrixAsPNG()" class="btn btn-outline-secondary">Download Matrix as PNG</button>
-                        <button type="button" onclick="downloadTableAsPNG()" class="btn btn-outline-secondary">Download Table as PNG</button>
-                        <a href="{% url 'download_stakeholders' project_id=project.id %}" class="btn btn-outline-secondary">Download Table as CSV</a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="d3-matrix-container" class="w-100"></div>
+      </div>
     </div>
 
+    <!-- RIGHT: Add form + sliders + exports -->
+    <div class="col-lg-4">
+      <div class="card p-3 mb-3">
+        <h5 class="mb-2">Add New Stakeholder</h5>
+        <div class="muted small mb-2">Name + initial Power/Interest (0–100). You can adjust later.</div>
+
+        <form method="post" id="addStakeholderForm">
+          {% csrf_token %}
+
+          <div class="mb-2">
+            <label class="form-label small">Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small">Interest (0–100)</label>
+            <input type="number" name="interest" class="form-control" min="0" max="100" value="50" required>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small">Power (0–100)</label>
+            <input type="number" name="power" class="form-control" min="0" max="100" value="50" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mt-2">Add Stakeholder</button>
+        </form>
+      </div>
 
 
-    <script>
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const apiUrl = `/workshops/project/{{ project.id }}/stakeholders/data/`;
 
-        // --- D3.js Chart Drawing Function ---
-        function drawChart() {
-            const margin = {top: 20, right: 30, bottom: 50, left: 60};
-            const container = d3.select("#d3-matrix-container");
-            const containerWidth = container.node().getBoundingClientRect().width;
-            const width = containerWidth - margin.left - margin.right;
-            const height = 500 - margin.top - margin.bottom;
+      <div class="card p-3">
+        <h5 class="mb-2">Export</h5>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-secondary" onclick="downloadMatrixAsPNG()">Download Matrix (PNG)</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="downloadTableAsPNG()">Download Table (PNG)</button>
+        </div>
+      </div>
+    </div>
+      <div class="card p-0">
+        <div class="p-3 border-bottom">
+          <h5 class="mb-0">Stakeholder Details</h5>
+          <div class="muted small">Use dropdowns to classify stakeholders. Changes save instantly.</div>
+        </div>
 
-            // Clear the old chart before drawing
-            d3.select("#d3-matrix-container").selectAll("svg").remove();
+        <div class="table-responsive p-0">
+          <table class="table table-striped table-hover mb-0 align-middle" id="stakeholder-table">
+            <thead class="table-dark">
+              <tr>
+                <th>Name</th>
+                <th style="width: 160px;">Level</th>
+                <th style="width: 200px;">Typology</th>
+                <th style="width: 160px;">Resources</th>
+                <th class="print-hide" style="width: 110px;">Actions</th>
+                  <th class="print-hide" style="width:110px;">Adjust</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in stakeholders %}
+                <tr>
+                  <td class="fw-semibold">{{ s.name }}</td>
 
-            const svg = container.append("svg")
-                .attr("width", containerWidth)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
+                  <!-- Level -->
+                  <td>
+                    <div class="dropdown">
+                      <button class="color-tag tag-select-btn dropdown-toggle {% if s.level %}level-{{ s.level }}{% else %}tag-default{% endif %}"
+                              type="button" id="level-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
+                        {{ s.get_level_display|default:"Select..." }}
+                      </button>
+                      <ul class="dropdown-menu" aria-labelledby="level-{{s.id}}">
+                        <li><a class="dropdown-item" href="#" data-field="level" data-value="Local" data-id="{{s.id}}"><span class="color-tag level-Local">Local</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="level" data-value="Provincial" data-id="{{s.id}}"><span class="color-tag level-Provincial">Provincial</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="level" data-value="Regional" data-id="{{s.id}}"><span class="color-tag level-Regional">Regional</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="level" data-value="National" data-id="{{s.id}}"><span class="color-tag level-National">National</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="level" data-value="International" data-id="{{s.id}}"><span class="color-tag level-International">International</span></a></li>
+                      </ul>
+                    </div>
+                  </td>
 
-            const x = d3.scaleLinear().domain([0, 100]).range([0, width]);
-            const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
+                  <!-- Typology -->
+                  <td>
+                    <div class="dropdown">
+                      <button class="color-tag tag-select-btn dropdown-toggle {% if s.typology %}typology-{{ s.typology }}{% else %}tag-default{% endif %}"
+                              type="button" id="typology-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
+                        {{ s.get_typology_display|default:"Select..." }}
+                      </button>
+                      <ul class="dropdown-menu" aria-labelledby="typology-{{s.id}}">
+                        <li><a class="dropdown-item" href="#" data-field="typology" data-value="Political" data-id="{{s.id}}"><span class="color-tag typology-Political">Political actors</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="typology" data-value="Bureaucratic" data-id="{{s.id}}"><span class="color-tag typology-Bureaucratic">Bureaucratic actors</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="typology" data-value="Special" data-id="{{s.id}}"><span class="color-tag typology-Special">Special interests</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="typology" data-value="General" data-id="{{s.id}}"><span class="color-tag typology-General">General interests</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="typology" data-value="Experts" data-id="{{s.id}}"><span class="color-tag typology-Experts">Experts</span></a></li>
+                      </ul>
+                    </div>
+                  </td>
 
-            let tooltip = d3.select("body").select(".d3-tooltip");
-                if (tooltip.empty()) {
-                    tooltip = d3.select("body").append("div")
-            .attr("class", "d3-tooltip");
-                    }
+                  <!-- Resources -->
+                  <td>
+                    <div class="dropdown">
+                      <button class="color-tag tag-select-btn dropdown-toggle {% if s.resources %}resources-{{ s.resources }}{% else %}tag-default{% endif %}"
+                              type="button" id="resources-{{s.id}}" data-bs-toggle="dropdown" data-bs-strategy="fixed">
+                        {{ s.get_resources_display|default:"Select..." }}
+                      </button>
+                      <ul class="dropdown-menu" aria-labelledby="resources-{{s.id}}">
+                        <li><a class="dropdown-item" href="#" data-field="resources" data-value="Political" data-id="{{s.id}}"><span class="color-tag resources-Political">Political</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="resources" data-value="Economic" data-id="{{s.id}}"><span class="color-tag resources-Economic">Economic</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="resources" data-value="Legal" data-id="{{s.id}}"><span class="color-tag resources-Legal">Legal</span></a></li>
+                        <li><a class="dropdown-item" href="#" data-field="resources" data-value="Cognitive" data-id="{{s.id}}"><span class="color-tag resources-Cognitive">Cognitive</span></a></li>
+                      </ul>
+                    </div>
+                  </td>
 
-            // Draw Quadrant Backgrounds
-            const quadrantData = [
-                { x: 0, y: y(50), w: width/2, h: height/2, color: "#f7f7f7" }, // Secondary
-                { x: width/2, y: y(50), w: width/2, h: height/2, color: "#e6f7f4" }, // Supporting
-                { x: 0, y: y(100), w: width/2, h: height/2, color: "#fff9e6" }, // Formal
-                { x: width/2, y: y(100), w: width/2, h: height/2, color: "#ffefef" }  // Key
-            ];
-            svg.append("g").selectAll("rect").data(quadrantData).join("rect")
-                .attr("x", d => d.x).attr("y", d => d.y)
-                .attr("width", d => d.w).attr("height", d => d.h)
-                .style("fill", d => d.color);
+                  <!-- Delete -->
+                  <td class="print-hide">
+                      <form action="{% url 'delete_stakeholder' s.id %}" method="post" class="d-inline delete-form">
+                          {% csrf_token %}
+                          <button type="button"
+                                  class="btn btn-sm btn-outline-danger"
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#deleteStakeholderModal"
+                                  data-stakeholder-name="{{ s.name|escapejs }}"
+                                  onclick="prepareDelete(this)">
+                            Delete
+                          </button>
+                        </form>
+                    </td>
 
-            // Draw Quadrant Labels
-            const quadrantLabels = [
-                { x: 5, y: y(45), label: "Secondary Stakeholders", anchor: "start" },
-                { x: width/2 + 5, y: y(46) , label: "Supporting Stakeholders", anchor: "start" },
-                { x: 5, y: y(95), label: "Formal Stakeholders", anchor: "start" },
-                { x: width/2 + 5, y: y(95) , label: "Key Stakeholders", anchor: "start" }
-            ];
-            svg.append("g").selectAll("text").data(quadrantLabels).join("text")
-                .attr("class", "quadrant-label")
-                .attr("x", d => d.x).attr("y", d => d.y)
-                .attr("text-anchor", d => d.anchor)
-                .text(d => d.label);
+                    <td class="print-hide">
+                      <button type="button"
+                            class="btn btn-sm btn-outline-primary adjust-btn"
+                            data-id="{{ s.id }}"
+                            data-name="{{ s.name|escapejs }}"
+                            data-interest="{{ s.interest }}"
+                            data-power="{{ s.power }}">
+                      Edit P/I
+                    </button>
+                    </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="6" class="text-center p-4 muted">No stakeholders added yet.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+  </div>
+</div>
+<div class="modal fade" id="adjustModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Adjust Power & Interest</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 fw-semibold" id="adjustName">Stakeholder</div>
 
-            // Draw Axes and Arrowheads
-            svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(x));
-            svg.append("g").call(d3.axisLeft(y));
-            svg.append('defs').append('marker').attr('id', 'arrowhead').attr('viewBox', '-0 -5 10 10').attr('refX', 10).attr('orient', 'auto').attr('markerWidth', 8).attr('markerHeight', 8).append('svg:path').attr('d', 'M 0,-5 L 10 ,0 L 0,5').attr('fill', '#000');
-            svg.append('line').attr('x1', 0).attr('x2', width).attr('y1', height).attr('y2', height).attr('stroke', 'black').attr('marker-end', 'url(#arrowhead)');
-            svg.append('line').attr('x1', 0).attr('x2', 0).attr('y1', height).attr('y2', 0).attr('stroke', 'black').attr('marker-end', 'url(#arrowhead)');
-            svg.append("text").attr("class", "axis-label").attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`).text("Interest");
-            svg.append("text").attr("class", "axis-label").attr("transform", "rotate(-90)").attr("y", 0 - margin.left + 15).attr("x", 0 - (height / 2)) .text("Power");
+        <label class="form-label small">Interest: <span id="adjInterestLabel" class="fw-bold"></span></label>
+        <input id="adjInterest" type="range" class="form-range" min="0" max="100">
 
-            // Draw Data Points (with Cache-Busting Fix)
-            const uniqueApiUrl = apiUrl + '?v=' + new Date().getTime();
+        <label class="form-label small mt-2">Power: <span id="adjPowerLabel" class="fw-bold"></span></label>
+        <input id="adjPower" type="range" class="form-range" min="0" max="100">
 
-            d3.json(uniqueApiUrl).then(function(data) {
-                svg.append('g').selectAll("g").data(data).join("g")
-                  .attr("class", "stakeholder-node").attr("transform", d => `translate(${x(d.interest)}, ${y(d.power)})`)
-                    .on("mouseover", function(event, d) {
-              tooltip.transition().style("opacity", .9);
-                tooltip.html(`<strong>Power:</strong> ${d.power}<br><strong>Interest:</strong> ${d.interest}`)                  .style("left", (event.pageX + 10) + "px")
-                  .style("top", (event.pageY - 28) + "px");
+        <input type="hidden" id="adjId">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="adjSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="modal fade" id="deleteStakeholderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm deletion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-2">Are you sure you want to delete this stakeholder?</div>
+        <div class="fw-semibold" id="deleteStakeholderName">—</div>
+        <div class="text-muted small mt-2">This action cannot be undone.</div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- External libs -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+  // CSRF (single source)
+  const csrfToken =
+    (typeof window.getCSRFToken === "function" && window.getCSRFToken()) ||
+    document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+    "";
+
+  const apiUrl = "{% url 'stakeholder_data_api' project.id %}";
+
+  // ---------- Chart ----------
+  function drawChart() {
+    const margin = {top: 20, right: 30, bottom: 50, left: 60};
+    const container = d3.select("#d3-matrix-container");
+    const containerWidth = container.node().getBoundingClientRect().width || 800;
+    const width = containerWidth - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+
+    d3.select("#d3-matrix-container").selectAll("svg").remove();
+
+    const svg = container.append("svg")
+      .attr("width", containerWidth)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleLinear().domain([0, 100]).range([0, width]);
+    const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
+
+    let tooltip = d3.select("body").select(".d3-tooltip");
+    if (tooltip.empty()) tooltip = d3.select("body").append("div").attr("class", "d3-tooltip");
+
+    const quadrantData = [
+      { x: 0,       y: y(50),  w: width/2, h: height/2, color: "#f7f7f7" },
+      { x: width/2, y: y(50),  w: width/2, h: height/2, color: "#e6f7f4" },
+      { x: 0,       y: y(100), w: width/2, h: height/2, color: "#fff9e6" },
+      { x: width/2, y: y(100), w: width/2, h: height/2, color: "#ffefef" }
+    ];
+
+    svg.append("g").selectAll("rect").data(quadrantData).join("rect")
+      .attr("x", d => d.x).attr("y", d => d.y)
+      .attr("width", d => d.w).attr("height", d => d.h)
+      .style("fill", d => d.color);
+
+    const quadrantLabels = [
+      { x: 5, y: y(45), label: "Secondary Stakeholders" },
+      { x: width/2 + 5, y: y(45), label: "Supporting Stakeholders" },
+      { x: 5, y: y(95), label: "Formal Stakeholders" },
+      { x: width/2 + 5, y: y(95), label: "Key Stakeholders" }
+    ];
+
+    svg.append("g").selectAll("text").data(quadrantLabels).join("text")
+      .attr("x", d => d.x).attr("y", d => d.y)
+      .attr("text-anchor", "start")
+      .style("font-weight", "700")
+      .style("fill", "rgba(0,0,0,0.45)")
+      .text(d => d.label);
+
+    svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(x));
+    svg.append("g").call(d3.axisLeft(y));
+
+    svg.append("text")
+      .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
+      .style("font-weight", "700")
+      .text("Interest");
+
+    svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 0 - margin.left + 15)
+      .attr("x", 0 - (height / 2))
+      .style("font-weight", "700")
+      .text("Power");
+
+    const uniqueApiUrl = apiUrl + "?v=" + new Date().getTime();
+
+    d3.json(uniqueApiUrl).then((data) => {
+      svg.append("g")
+        .selectAll("g")
+        .data(data)
+        .join("g")
+        .attr("transform", d => `translate(${x(d.interest)}, ${y(d.power)})`)
+        .on("mouseover", function(event, d) {
+          tooltip.style("opacity", 0.95);
+          tooltip.html(`<strong>${d.name}</strong><br>Power: ${d.power}<br>Interest: ${d.interest}`)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 28) + "px")
+        .on("click", (event, d) => {
+              // find stakeholder id by name is not safe; best is to include id in API
+              // We'll do this properly by adding id to stakeholder_data (backend) if you want.
+            })
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0))
+        .call(g => g.append("circle")
+          .attr("r", 10)
+          .style("stroke", "rgba(0,0,0,0.55)")
+          .style("stroke-width", 1.4)
+          .style("fill", d => {
+            if (d.power >= 50 && d.interest >= 50) return "#d9534f";
+            if (d.power >= 50 && d.interest < 50) return "#f0ad4e";
+            if (d.power < 50 && d.interest >= 50) return "#5bc0de";
+            return "#5cb85c";
           })
-          .on("mouseout", function(d) {
-              tooltip.transition().style("opacity", 0);
-          })
-                  .call(g => g.append("circle")
-                      .attr("r", 10)
-                      .style("fill", d => {
-                          if (d.power >= 50 && d.interest >= 50) return "#d9534f"; // Key
-                          else if (d.power >= 50 && d.interest < 50) return "#f0ad4e"; // Formal
-                          else if (d.power < 50 && d.interest >= 50) return "#5bc0de"; // Supporting
-                          else return "#5cb85c"; // Secondary
-                      }))
-                  .call(g => g.append("text").text(d => d.name).attr("x", 15).attr("y", 5));
-            });
-        }
+        )
+        .call(g => g.append("text").text(d => d.name).attr("x", 15).attr("y", 5));
+    });
+  }
 
-        // --- Stakeholder Dropdown Update Function ---
-       // --- Stakeholder Dropdown Update Function ---
-        function updateStakeholder(event, stakeholderId, field, value) {
-            event.preventDefault();
+  // ---------- Update helper ----------
+  function postUpdate(stakeholderId, field, value) {
+    const updateUrl = `{% url 'update_stakeholder_details' 0 %}`.replace("/0/", `/${stakeholderId}/`);
+    return fetch(updateUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+      body: JSON.stringify({ field, value })
+    }).then(r => r.json());
+  }
 
-            // THIS IS THE FIX:
-            const updateUrl = `/workshops/stakeholder/update/${stakeholderId}/`;
-            const button = document.getElementById(`${field}-${stakeholderId}`);
-            const buttonText = event.currentTarget.querySelector('.color-tag').textContent;
+  // ---------- Dropdown edits ----------
+  document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".adjust-btn");
+  if (!btn) return;
 
-            button.textContent = buttonText;
-            button.className = `color-tag tag-select-btn dropdown-toggle ${field}-${value}`;
+  const id = btn.dataset.id;
+  const name = btn.dataset.name;
+  const interest = parseInt(btn.dataset.interest || "0", 10);
+  const power = parseInt(btn.dataset.power || "0", 10);
 
-            fetch(updateUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ field: field, value: value })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status !== 'success') {
-                    alert("Error saving change: " + data.message);
-                }
-            })
-            .catch(error => console.error('Error:', error));
+  openAdjustModal(id, name, interest, power);
+});
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a.dropdown-item[data-id]");
+    if (!a) return;
+    e.preventDefault();
 
-            const dropdownInstance = bootstrap.Dropdown.getInstance(button);
-            if (dropdownInstance) {
-                dropdownInstance.hide();
-            }
-        }
+    const stakeholderId = a.dataset.id;
+    const field = a.dataset.field;
+    const value = a.dataset.value;
 
-        // --- Slider Value Save Function ---
-        function updateStakeholderValue(slider, stakeholderId, field) {
-            const value = slider.value;
+    const button = document.getElementById(`${field}-${stakeholderId}`);
+    const pillText = a.querySelector(".color-tag")?.textContent?.trim() || value;
 
-            // THIS IS THE FIX:
-            const updateUrl = `/workshops/stakeholder/update/${stakeholderId}/`;
+    if (button) {
+      button.textContent = pillText;
+      button.className = `color-tag tag-select-btn dropdown-toggle ${field}-${value}`;
+    }
 
-            fetch(updateUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ field: field, value: value })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    drawChart();
-                } else {
-                    alert("Error saving change: ".concat(data.message));
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        }
-        function updateSliderLabel(slider) {
-            // Get the slider's current value
-            const value = slider.value;
+    postUpdate(stakeholderId, field, value).then((data) => {
+      if (data.status !== "success") alert("Error saving change: " + (data.message || "Unknown error"));
+    }).catch(() => alert("Network error while saving."));
+  });
 
-            // Find the corresponding label span (which has an ID of "slider-id" + "-label")
-            const label = document.getElementById(slider.id + '-label');
+  // ---------- Adjust modal ----------
+  let adjustModal;
 
-            // Update the label's text
-            if (label) {
-                label.textContent = value;
-            }
-        }
-        // --- Download Matrix as PNG ---
-        function downloadMatrixAsPNG() {
-            const matrixElement = document.getElementById("d3-matrix-container");
-            html2canvas(matrixElement, { scale: 2 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = 'stakeholder-matrix.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            });
-        }
+  function openAdjustModal(id, name, interest, power) {
+    document.getElementById("adjId").value = id;
+    document.getElementById("adjustName").textContent = name;
 
-        // --- Download Table as PNG ---
-        function downloadTableAsPNG() {
-            const tableElement = document.getElementById("stakeholder-table");
-            tableElement.classList.add("table-is-printing");
+    document.getElementById("adjInterest").value = interest;
+    document.getElementById("adjPower").value = power;
+    document.getElementById("adjInterestLabel").textContent = interest;
+    document.getElementById("adjPowerLabel").textContent = power;
 
-            html2canvas(tableElement, {
-                scale: 2
-            }).then(canvas => {
-                tableElement.classList.remove("table-is-printing");
-                const link = document.createElement('a');
-                link.download = 'stakeholder-table.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            });
-        }
+    adjustModal.show();
+  }
+  window.openAdjustModal = openAdjustModal;
 
-        // --- Initial Chart Draw ---
+  document.addEventListener("DOMContentLoaded", () => {
+    adjustModal = new bootstrap.Modal(document.getElementById("adjustModal"));
+
+    const interest = document.getElementById("adjInterest");
+    const power = document.getElementById("adjPower");
+    const iLabel = document.getElementById("adjInterestLabel");
+    const pLabel = document.getElementById("adjPowerLabel");
+
+    interest.addEventListener("input", () => iLabel.textContent = interest.value);
+    power.addEventListener("input", () => pLabel.textContent = power.value);
+
+    document.getElementById("adjSaveBtn").addEventListener("click", async () => {
+      const id = document.getElementById("adjId").value;
+      const iVal = document.getElementById("adjInterest").value;
+      const pVal = document.getElementById("adjPower").value;
+
+      const r1 = await postUpdate(id, "interest", iVal);
+      const r2 = await postUpdate(id, "power", pVal);
+
+      if (r1.status === "success" && r2.status === "success") {
+              const btn = document.querySelector(`.adjust-btn[data-id="${id}"]`);
+    if (btn) {
+      btn.dataset.interest = String(iVal);
+      btn.dataset.power = String(pVal);
+    }
+        adjustModal.hide();
         drawChart();
+      } else {
+        alert("Failed to save changes.");
+      }
+    });
 
-    </script>
+    // Initial draw + redraw on resize
+    drawChart();
+    window.addEventListener("resize", () => drawChart());
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    // AJAX add stakeholder (no refresh) – requires backend to return JSON for AJAX
+    const form = document.getElementById("addStakeholderForm");
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+
+        const res = await fetch(window.location.href, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: formData,
+        });
+
+        if (!res.ok) return alert("Failed to add stakeholder.");
+        const data = await res.json();
+        if (data.status !== "ok") return alert("Failed to add stakeholder.");
+
+        // For now: simplest correct UX without full row-templating complexity:
+        // update chart immediately, then reload to show new row in table.
+        // If you want zero refresh, we'll append row in JS next.
+        drawChart();
+        window.location.reload();
+      });
+    }
+  });
+
+  // ---------- PNG exports ----------
+  function downloadMatrixAsPNG() {
+    const matrixElement = document.getElementById("d3-matrix-container");
+    html2canvas(matrixElement, { scale: 2 }).then(canvas => {
+      const link = document.createElement("a");
+      link.download = "stakeholder-matrix.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  }
+  window.downloadMatrixAsPNG = downloadMatrixAsPNG;
+
+  function downloadTableAsPNG() {
+    const tableElement = document.getElementById("stakeholder-table");
+    tableElement.classList.add("table-is-printing");
+    html2canvas(tableElement, { scale: 2 }).then(canvas => {
+      tableElement.classList.remove("table-is-printing");
+      const link = document.createElement("a");
+      link.download = "stakeholder-table.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  }
+  window.downloadTableAsPNG = downloadTableAsPNG;
+
+  let formToDelete = null;
+
+function prepareDelete(buttonEl) {
+  // find the parent form for this delete button
+  formToDelete = buttonEl.closest("form");
+  const name = buttonEl.getAttribute("data-stakeholder-name") || "this stakeholder";
+  document.getElementById("deleteStakeholderName").textContent = name;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("confirmDeleteBtn").addEventListener("click", () => {
+    if (formToDelete) formToDelete.submit();
+  });
+});
+</script>
+{% endblock %}
