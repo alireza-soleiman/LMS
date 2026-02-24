@@ -81,9 +81,8 @@
 
 <div class="container py-4" id="overviewContainer">
   <div class="d-flex justify-content-between align-items-center mb-3 overview-header">
-    <h3 class="mb-0">{{ project.title }} — Project Overview</h3>
-    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">← Back to Dashboard</a>
-  </div>
+    <h3 class="mb-0">Workshop 1 - Idea Canvas</h3>
+        <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary">← Back to Project Home</a>  </div>
   <p class="text-muted">
     Fill in each section below. Your inputs auto-save after typing.
     You can also “Save & Continue” or export your overview as a PDF.
@@ -140,16 +139,17 @@
   <div class="card p-3 mb-3 border-start border-4 border-warning-subtle">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <div class="section-label text-warning">D2 — Impact on SDGs</div>
-      <button id="openSdgSelector" class="btn btn-outline-warning btn-sm">🌍 Choose SDGs</button>
+      <button id="openSdgSelector" class="btn btn-outline-warning btn-sm" type="button">🌍 Choose SDGs</button>
     </div>
 
-    <!-- This will be populated by JavaScript -->
     <div id="selectedSdgs" class="d-flex flex-wrap gap-2 mb-2"></div>
 
-    <textarea id="boxD2" class="form-control" rows="2"
-              placeholder="Selected SDG numbers (auto-filled)">
-      {{ overview.D2.text }}
-    </textarea>
+    <!-- ✅ SINGLE source of truth (persisted from DB) -->
+    <input type="hidden" id="sdg_ids" value="{{ overview.D2_SDGS.text|default:'' }}">
+
+    <!-- Optional notes -->
+    <textarea id="boxD2" class="form-control" rows="3"
+      placeholder="Optional: briefly explain how your project contributes to the selected SDGs...">{{ overview.D2.text }}</textarea>
   </div>
 </div>
 
@@ -209,110 +209,27 @@
 
 <div class="save-toast" id="saveToast">Saved ✓</div>
 
+
 <!-- Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const boxes = ["A1","A2","B1","B2","C1","C2","C3","D2"];
-  const debounceTimers = {};
   const toast = document.getElementById("saveToast");
 
-  function showToast(msg="Saved ✓") {
+  function showToast(msg, type="success") {
+    if (!toast) return;
     toast.textContent = msg;
+    toast.style.background =
+      type === "success" ? "#198754" :
+      type === "info" ? "#0d6efd" : "#dc3545";
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 1800);
   }
 
-  async function saveBox(box, text) {
-    try {
-      const res = await fetch("{% url 'project_overview' project.id %}", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": "{{ csrf_token }}",
-        },
-        body: JSON.stringify({ box, text }),
-      });
-      const data = await res.json();
-      if (data.status === "ok") showToast();
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  }
-
-  // Auto-save when typing stops
-  boxes.forEach(b => {
-    const el = document.getElementById("box" + b);
-    el?.addEventListener("input", () => {
-      clearTimeout(debounceTimers[b]);
-      debounceTimers[b] = setTimeout(() => saveBox(b, el.value), 1200);
-    });
-  });
-
-  // Save all and redirect
-  document.getElementById("saveAllBtn").addEventListener("click", async () => {
-    for (const b of boxes) {
-      await saveBox(b, document.getElementById("box" + b).value);
-    }
-    showToast("All saved ✓");
-    setTimeout(() => (window.location.href = "{% url 'workshop_list' project.id %}"), 1500);
-  });
-
-  // Generate PDF
-  document.getElementById("downloadOverview").addEventListener("click", async () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
-    const margin = 30;
-    let y = 70;
-    const lineHeight = 15;
-    const maxWidth = 500;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Project Overview Report", margin, 30);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.text("Project: {{ project.title }}", margin, 50);
-    doc.text("Generated on: " + new Date().toLocaleString(), margin, 65);
-
-    const sections = [
-      ["A1 — Problem", document.getElementById("boxA1").value, "#dc3545"],
-      ["A2 — Context", document.getElementById("boxA2").value, "#dc3545"],
-      ["B1 — Solution", document.getElementById("boxB1").value, "#0d6efd"],
-      ["B2 — Activities", document.getElementById("boxB2").value, "#0d6efd"],
-      ["C1 — Stakeholders", document.getElementById("boxC1").value, "#6f42c1"],
-      ["C2 — Resources", document.getElementById("boxC2").value, "#6f42c1"],
-      ["C3 — Dissemination", document.getElementById("boxC3").value, "#6f42c1"],
-      ["D2 — Impact on SDGs", document.getElementById("boxD2").value, "#ffc107"],
-    ];
-
-    for (const [title, text, color] of sections) {
-      if (y > 760) { doc.addPage(); y = 60; }
-      doc.setFillColor(color);
-      doc.rect(margin, y - 8, 6, 6, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(title, margin + 14, y - 1);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      const lines = doc.splitTextToSize(text || "— No input provided —", maxWidth);
-      doc.text(lines, margin, y + 12);
-      y += (lines.length + 2) * lineHeight;
-    }
-
-    doc.setFontSize(10);
-    doc.setTextColor(140);
-    doc.text("Generated automatically by LMS Platform", margin, 820);
-    doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
-  });
-});
-
-
-</script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
+  // ------------------------------
+  // SDG Selector (persisted via hidden input + backend save)
+  // ------------------------------
   const sdgs = [
     "No Poverty","Zero Hunger","Good Health and Well-being","Quality Education","Gender Equality",
     "Clean Water and Sanitation","Affordable and Clean Energy","Decent Work and Economic Growth",
@@ -323,54 +240,417 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const sdgGrid = document.getElementById("sdgGrid");
   const selectedContainer = document.getElementById("selectedSdgs");
-  const textarea = document.getElementById("boxD2");
-  const modal = new bootstrap.Modal(document.getElementById("sdgModal"));
+  const hiddenIds = document.getElementById("sdg_ids");     // MUST exist
   const openBtn = document.getElementById("openSdgSelector");
   const saveBtn = document.getElementById("saveSdgs");
+  const modalEl = document.getElementById("sdgModal");
+  const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
-  // Populate SDG Grid
-  sdgs.forEach((name, i) => {
-    const id = i + 1;
-    const col = document.createElement("div");
-    col.className = "col-6 col-md-3 text-center";
-    col.innerHTML = `
-      <div class="sdg-item">
-        <img src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-${String(id).padStart(2,'0')}.jpg"
-             alt="${name}" title="${name}"
-             class="sdg-icon" data-id="${id}">
-        <div class="small mt-1">${name}</div>
-      </div>`;
-    sdgGrid.appendChild(col);
-  });
+  function parseIds() {
+    const raw = (hiddenIds?.value || "").trim();
+    if (!raw) return [];
+    return raw.split(",").map(s => s.trim()).filter(Boolean);
+  }
 
-  // Preselect from textarea (if already saved)
-  const preselected = (textarea.value || "")
-    .split(",")
-    .map(v => v.trim())
-    .filter(Boolean);
+  function setIds(ids) {
+    if (hiddenIds) hiddenIds.value = ids.join(",");
+  }
 
-  const sdgIcons = sdgGrid.querySelectorAll(".sdg-icon");
-  sdgIcons.forEach(icon => {
-    if (preselected.includes(icon.dataset.id)) icon.classList.add("selected");
-    icon.addEventListener("click", () => icon.classList.toggle("selected"));
-  });
+  function renderChips() {
+    if (!selectedContainer) return;
+    const ids = parseIds();
 
-  openBtn.addEventListener("click", () => modal.show());
+    if (!ids.length) {
+      selectedContainer.innerHTML = `<span class="text-muted small">No SDGs selected yet.</span>`;
+      return;
+    }
 
-  // Save selected SDGs
-  saveBtn.addEventListener("click", () => {
-    const selected = [...sdgGrid.querySelectorAll(".sdg-icon.selected")].map(el => el.dataset.id);
-    textarea.value = selected.join(",");
-    selectedContainer.innerHTML = selected
-      .map(id => `<img src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-${String(id).padStart(2,'0')}.jpg"
-                        title="SDG ${id}" class="sdg-icon selected-icon">`)
+    selectedContainer.innerHTML = ids
+      .map(idStr => {
+        const id = parseInt(idStr, 10);
+        const title = sdgs[id - 1] || "Unknown SDG";
+        return `
+          <span class="badge rounded-pill text-bg-warning d-inline-flex align-items-center gap-2"
+                style="padding:0.55rem 0.7rem; color:#111827;">
+            <strong>SDG ${id}</strong> — ${title}
+            <button type="button" class="btn btn-sm btn-light ms-2 sdg-remove"
+                    data-id="${id}" style="border-radius:999px; padding:0 0.4rem;">×</button>
+          </span>
+        `;
+      })
       .join("");
-    modal.hide();
 
-    // Trigger auto-save
-    textarea.dispatchEvent(new Event("input"));
+    selectedContainer.querySelectorAll(".sdg-remove").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const removeId = btn.dataset.id;
+        const next = parseIds().filter(x => x !== String(removeId));
+        setIds(next);
+        renderChips();
+      });
+    });
+  }
+
+  // Build SDG grid once
+  if (sdgGrid) {
+    sdgGrid.innerHTML = "";
+    sdgs.forEach((name, i) => {
+      const id = i + 1;
+      const col = document.createElement("div");
+      col.className = "col-6 col-md-3 text-center";
+      col.innerHTML = `
+        <div class="sdg-item">
+          <img
+            src="https://sdgs.un.org/sites/default/files/goals/E_SDG_Icons-${String(id).padStart(2,'0')}.jpg"
+            alt="${name}" title="${name}"
+            class="sdg-icon" data-id="${id}">
+          <div class="small mt-1">${name}</div>
+        </div>
+      `;
+      sdgGrid.appendChild(col);
+    });
+
+    sdgGrid.addEventListener("click", (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      if (!t.classList.contains("sdg-icon")) return;
+      t.classList.toggle("selected");
+    });
+  }
+
+  function syncModal() {
+    const selected = new Set(parseIds());
+    sdgGrid?.querySelectorAll(".sdg-icon").forEach(icon => {
+      if (selected.has(icon.dataset.id)) icon.classList.add("selected");
+      else icon.classList.remove("selected");
+    });
+  }
+
+  openBtn?.addEventListener("click", () => {
+    syncModal();
+    modal?.show();
   });
+
+  saveBtn?.addEventListener("click", () => {
+    const selected = [...sdgGrid.querySelectorAll(".sdg-icon.selected")]
+      .map(el => el.dataset.id)
+      .sort((a,b) => parseInt(a,10) - parseInt(b,10));
+    setIds(selected);
+    renderChips();
+    modal?.hide();
+  });
+
+  // Initial render from DB value
+  renderChips();
+
+  // ------------------------------
+  // Save & Continue (NO autosave)
+  // ------------------------------
+  async function saveAll() {
+    const payload = {
+      all: true,
+      sdg_ids: (hiddenIds?.value || "").trim(),
+      values: {
+        A1: document.getElementById("boxA1")?.value ?? "",
+        A2: document.getElementById("boxA2")?.value ?? "",
+        B1: document.getElementById("boxB1")?.value ?? "",
+        B2: document.getElementById("boxB2")?.value ?? "",
+        C1: document.getElementById("boxC1")?.value ?? "",
+        C2: document.getElementById("boxC2")?.value ?? "",
+        C3: document.getElementById("boxC3")?.value ?? "",
+        D2: document.getElementById("boxD2")?.value ?? "",
+      }
+    };
+
+    const res = await fetch("{% url 'project_overview' project.id %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": window.getCSRFToken(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const raw = await res.text();
+      console.error("Save failed:", res.status, raw);
+      return false;
+    }
+    const data = await res.json();
+    return data.status === "ok";
+  }
+
+  const saveAllBtn = document.getElementById("saveAllBtn");
+  saveAllBtn?.addEventListener("click", async () => {
+    saveAllBtn.disabled = true;
+    const old = saveAllBtn.textContent;
+    saveAllBtn.textContent = "Saving…";
+
+    const ok = await saveAll();
+
+    saveAllBtn.disabled = false;
+    saveAllBtn.textContent = old || "💾 Save & Continue";
+
+    if (ok) {
+      showToast("Saved ✓", "success");
+      setTimeout(() => {
+        window.location.href = "{% url 'workshop_list' project.id %}";
+      }, 500);
+    } else {
+      showToast("Save failed", "error");
+    }
+  });
+
+  // ------------------------------
+  // Professional PDF export (structured, no screenshot)
+  // ------------------------------
+  function sdgLabelList() {
+    const ids = parseIds();
+    if (!ids.length) return ["— None selected —"];
+    return ids.map(idStr => {
+      const id = parseInt(idStr, 10);
+      const title = sdgs[id - 1] || "Unknown SDG";
+      return `SDG ${id} — ${title}`;
+    });
+  }
+
+document.getElementById("downloadOverview")?.addEventListener("click", () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("p", "mm", "a4");
+
+  // --- Theme ---
+  const COLORS = {
+    ink: [15, 23, 42],
+    muted: [71, 85, 105],
+    border: [226, 232, 240],
+    cardBg: [248, 250, 252],
+    headerBg: [30, 41, 59],
+    white: [255, 255, 255],
+    red: [220, 53, 69],
+    blue: [13, 110, 253],
+    purple: [111, 66, 193],
+    amber: [245, 158, 11],
+  };
+
+  const sdgNames = [
+    "No Poverty","Zero Hunger","Good Health and Well-being","Quality Education","Gender Equality",
+    "Clean Water and Sanitation","Affordable and Clean Energy","Decent Work and Economic Growth",
+    "Industry, Innovation and Infrastructure","Reduced Inequalities","Sustainable Cities and Communities",
+    "Responsible Consumption and Production","Climate Action","Life Below Water","Life on Land",
+    "Peace, Justice and Strong Institutions","Partnerships for the Goals"
+  ];
+
+  // --- Page geometry ---
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const gutter = 6;
+  const colW = (pageW - margin * 2 - gutter) / 2;
+  const bottomSafe = 14;
+
+  let pageNum = 1;
+  let y = 0;
+
+  const setRGB = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+
+  function footer() {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    setRGB(COLORS.muted);
+    doc.text(`Page ${pageNum}`, pageW - margin, pageH - 8, { align: "right" });
+    setRGB(COLORS.ink);
+  }
+
+  function newPage() {
+    footer();
+    doc.addPage();
+    pageNum += 1;
+    drawHeader(false);
+    y = 44; // after header+meta baseline
+  }
+
+  function ensureSpace(hNeeded) {
+    if (y + hNeeded > pageH - bottomSafe) newPage();
+  }
+
+  function normalizeText(value) {
+    const t = (value ?? "").toString().replace(/\r\n/g, "\n").trim();
+    return t.length ? t : "—";
+  }
+
+  function wrapPreserveLines(text, width) {
+    // Wrap each line separately so bullets/newlines remain readable
+    const rawLines = normalizeText(text).split("\n");
+    const out = [];
+    for (const line of rawLines) {
+      const l = line.trim();
+      if (!l) { out.push(""); continue; }
+      const wrapped = doc.splitTextToSize(l, width);
+      out.push(...wrapped);
+    }
+    return out;
+  }
+
+  function drawHeader(withMeta = true) {
+    // Header band
+    doc.setFillColor(...COLORS.headerBg);
+    doc.rect(0, 0, pageW, 26, "F");
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...COLORS.white);
+    doc.text("Project Overview Report", margin, 16);
+
+    // Subtitle
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Workshop 1 — Idea Canvas", margin, 22);
+
+    // Meta panel
+    if (withMeta) {
+      const metaY = 30;
+      const metaH = 14;
+      doc.setDrawColor(...COLORS.border);
+      doc.setFillColor(...COLORS.cardBg);
+      doc.roundedRect(margin, metaY, pageW - margin * 2, metaH, 3, 3, "FD");
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...COLORS.muted);
+      doc.text(`Project: {{ project.title }}`, margin + 4, metaY + 6);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin + 4, metaY + 11);
+    }
+
+    doc.setTextColor(...COLORS.ink);
+  }
+
+  function drawCard(x, yTop, w, title, text, accentRGB) {
+    const paddingX = 6;
+    const titleH = 7;
+    const lineH = 4.6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+
+    const lines = wrapPreserveLines(text, w - paddingX * 2);
+    const contentH = Math.max(1, lines.length) * lineH;
+
+    const cardH = titleH + contentH + 8; // title + content + padding
+
+    // Card bg + border
+    doc.setDrawColor(...COLORS.border);
+    doc.setFillColor(...COLORS.cardBg);
+    doc.roundedRect(x, yTop, w, cardH, 3, 3, "FD");
+
+    // Accent bar
+    doc.setFillColor(...accentRGB);
+    doc.roundedRect(x, yTop, 3.2, cardH, 2, 2, "F");
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11.5);
+    doc.setTextColor(...COLORS.ink);
+    doc.text(title, x + paddingX, yTop + 6);
+
+    // Content
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(...COLORS.muted);
+
+    let yy = yTop + 12;
+    for (const line of lines) {
+      if (yy > pageH - bottomSafe) break; // safety (shouldn’t happen with ensureSpace)
+      doc.text(line || " ", x + paddingX, yy);
+      yy += lineH;
+    }
+
+    doc.setTextColor(...COLORS.ink);
+    return cardH;
+  }
+
+  function getSelectedSdgsText() {
+    const raw = (document.getElementById("sdg_ids")?.value || "").trim();
+    if (!raw) return "— None selected —";
+    const ids = raw.split(",").map(s => s.trim()).filter(Boolean);
+    return ids.map(idStr => {
+      const id = parseInt(idStr, 10);
+      const name = sdgNames[id - 1] || "Unknown SDG";
+      return `• SDG ${id} — ${name}`;
+    }).join("\n");
+  }
+
+  // --- Build content ---
+  drawHeader(true);
+  y = 48; // start under meta
+
+  // Two-column flow helper
+  let yL = y;
+  let yR = y;
+
+  function placeTwoCol(title, text, accent, col = "auto") {
+    const xL = margin;
+    const xR = margin + colW + gutter;
+
+    // estimate height by actually wrapping with current font settings
+    const paddingX = 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    const lines = wrapPreserveLines(text, colW - paddingX * 2);
+    const cardH = 7 + Math.max(1, lines.length) * 4.6 + 8 + 2; // small buffer
+
+    // choose column
+    let useLeft = true;
+    if (col === "left") useLeft = true;
+    else if (col === "right") useLeft = false;
+    else useLeft = (yL <= yR);
+
+    if (useLeft) {
+      if (yL + cardH > pageH - bottomSafe) newPage(), yL = 44, yR = 44;
+      const h = drawCard(xL, yL, colW, title, text, accent);
+      yL += h + 6;
+    } else {
+      if (yR + cardH > pageH - bottomSafe) newPage(), yL = 44, yR = 44;
+      const h = drawCard(xR, yR, colW, title, text, accent);
+      yR += h + 6;
+    }
+  }
+
+  // Workshop 1 cards (2 columns)
+  placeTwoCol("A1 — Problem", document.getElementById("boxA1")?.value, COLORS.red);
+  placeTwoCol("A2 — Context", document.getElementById("boxA2")?.value, COLORS.red);
+
+  placeTwoCol("B1 — Solution", document.getElementById("boxB1")?.value, COLORS.blue);
+  placeTwoCol("B2 — Activities", document.getElementById("boxB2")?.value, COLORS.blue);
+
+  placeTwoCol("C1 — Stakeholders", document.getElementById("boxC1")?.value, COLORS.purple);
+  placeTwoCol("C2 — Resources", document.getElementById("boxC2")?.value, COLORS.purple);
+
+  placeTwoCol("C3 — Dissemination", document.getElementById("boxC3")?.value, COLORS.purple, "left");
+
+  // SDGs + D2 as a full-width section on the next line
+  y = Math.max(yL, yR) + 2;
+  ensureSpace(10);
+
+  const fullW = pageW - margin * 2;
+
+  // Full-width card helper
+  function placeFull(title, text, accent) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    const paddingX = 6;
+    const lines = wrapPreserveLines(text, fullW - paddingX * 2);
+    const cardH = 7 + Math.max(1, lines.length) * 4.6 + 8 + 2;
+    ensureSpace(cardH + 6);
+    const h = drawCard(margin, y, fullW, title, text, accent);
+    y += h + 6;
+  }
+
+  placeFull("Selected SDGs", getSelectedSdgsText(), COLORS.amber);
+  placeFull("D2 — Impact on SDGs (notes)", document.getElementById("boxD2")?.value, COLORS.amber);
+
+  footer();
+  doc.save("Project_Overview_{{ project.title|slugify }}.pdf");
+});
 });
 </script>
-
 {% endblock %}

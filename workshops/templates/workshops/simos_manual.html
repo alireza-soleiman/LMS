@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Step 2: Calculate Weights</h2>
+        <a href="#" class="btn btn-outline-secondary btn-sm">Help?</a>
+    </div>
+
+    <p class="text-muted">
+        Based on your card ordering, calculate the position and weights for each indicator.
+        <br>
+        <em>Hint: Normalized Weight = Raw Weight / Total Raw Weight</em>
+    </p>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 30%;">Indicator</th>
+                            <th style="width: 20%;">Position (Rank)</th>
+                            <th style="width: 20%;">Raw Weight</th>
+                            <th style="width: 20%;">Normalized Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ind in indicators %}
+                        <tr>
+                            <td>
+                                <strong>{{ ind.name }}</strong>
+                            </td>
+
+                            <td>
+                                <div class="input-group has-validation">
+                                    <input type="number"
+                                           class="form-control calc-input"
+                                           step="1"
+                                           data-correct="{{ ind.position }}"
+                                           placeholder="?">
+                                    <span class="input-group-text feedback-icon"></span>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="input-group has-validation">
+                                    <input type="number"
+                                           class="form-control calc-input"
+                                           step="0.1"
+                                           data-correct="{{ ind.raw }}"
+                                           placeholder="?">
+                                    <span class="input-group-text feedback-icon"></span>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="input-group has-validation">
+                                    <input type="number"
+                                           class="form-control calc-input"
+                                           step="0.0001"
+                                           data-correct="{{ ind.normalized }}"
+                                           placeholder="0.0000">
+                                    <span class="input-group-text feedback-icon"></span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td class="text-end"><strong>Totals:</strong></td>
+                            <td></td>
+                            <td>
+                                <div class="input-group has-validation">
+                                    <input type="number"
+                                           id="totalInput"
+                                           class="form-control calc-input"
+                                           data-correct="{{ total }}"
+                                           placeholder="Sum">
+                                    <span class="input-group-text feedback-icon"></span>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>1.0000</strong>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                <button id="checkBtn" class="btn btn-primary px-4">
+                    <i class="bi bi-calculator"></i> Check My Calculation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    document.getElementById("checkBtn").addEventListener("click", function() {
+
+        const inputs = document.querySelectorAll(".calc-input");
+        let allCorrect = true;
+
+        inputs.forEach(inp => {
+            // 1. Get values
+            const userVal = parseFloat(inp.value);
+            const correctVal = parseFloat(inp.dataset.correct);
+            const feedbackSpan = inp.nextElementSibling; // The span next to input
+
+            // 2. Reset classes
+            inp.classList.remove("is-valid", "is-invalid");
+            feedbackSpan.innerHTML = "";
+            feedbackSpan.className = "input-group-text feedback-icon"; // Reset
+
+            // 3. Validation Logic
+            if (isNaN(userVal)) {
+                // Empty or text
+                inp.classList.add("is-invalid");
+                feedbackSpan.innerHTML = "❌";
+                allCorrect = false;
+            } else {
+                // Check tolerance (allow small rounding errors for floats)
+                // For integers (Position), tolerance should be strictly 0
+                // For weights, allow 0.01 difference
+                const tolerance = inp.step == "1" ? 0.0 : 0.015;
+
+                if (Math.abs(userVal - correctVal) <= tolerance) {
+                    inp.classList.add("is-valid");
+                    feedbackSpan.innerHTML = "✔";
+                    feedbackSpan.classList.add("text-success");
+                } else {
+                    inp.classList.add("is-invalid");
+                    feedbackSpan.innerHTML = "❌";
+                    feedbackSpan.classList.add("text-danger");
+                    allCorrect = false;
+                }
+            }
+        });
+
+        if (allCorrect) {
+            alert("Excellent! All calculations are correct.");
+        }
+    });
+
+});
+</script>
+
+{% endblock %}

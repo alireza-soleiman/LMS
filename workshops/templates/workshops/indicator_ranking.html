@@ -1,563 +1,449 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}SRF Playing Cards — {{ project.title }}{% endblock %}
+
+{% block title %}Indicator Ranking — {{ project.title }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h1 class="display-5 fw-bold mb-1">Workshop 3 — Indicator Ranking (SRF Method)</h1>
-    <p class="fs-5 text-muted mb-0">
-      Rank and group indicators like playing cards 🎴.
-      Drag to reorder → use “⬜ White Card” for gaps → merge equals with “🔗”.
-    </p>
-  </div>
-  <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
-    ← Back to Workshops
-  </a>
-</div>
-<hr class="my-4">
+<div class="container py-4">
+<!-- ===== HEADER ===== -->
+<div class="srf-header mb-4">
 
-<div class="alert alert-info">
-  <h5>🧩 How the SRF (Simos) Method Works</h5>
-  <p>
-    Drag the cards to rank indicators by importance. Use “⬜ White Cards” to indicate importance gaps
-    and “🔗 Merge Selected” for equal-importance indicators.
-  </p>
-  <p>
-    Click “💾 Save SRF Weights” to compute and save weights automatically.
-    This method converts qualitative rankings into quantitative weights using the Revised Simos procedure.
-  </p>
-</div>
+  <div class="srf-title">
+    <div class="srf-step-badge">WS3</div>
 
-<!-- 🎯 Buttons -->
-<div class="text-center mb-3">
-  <button id="addWhiteCard" class="btn btn-outline-secondary btn-sm">⬜ Add White Card (Gap)</button>
-  <button id="mergeCards" class="btn btn-outline-primary btn-sm">🔗 Merge Selected (Equal Importance)</button>
-  <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
-    ← Back to Workshops
-  </a>
-</div>
-<div class="text-center mb-2">
-  <span class="badge bg-danger-subtle text-danger fs-6 px-3 py-2">⬆ Most Important (Top of Board)</span>
-</div>
-<!-- 🎴 Main board -->
-<div id="board" class="p-3 bg-light rounded shadow-sm">
-  {% for ind in indicators %}
-  <div class="card srf-card" data-id="{{ ind.id }}">
-    <div class="card-body d-flex align-items-center justify-content-center text-center p-3">
-      <h6 class="mb-0">{{ ind.name }}</h6>
+    <div>
+      <h2 class="mb-1">SRF Playing Card Ranking</h2>
+      <p class="text-muted mb-0">
+        Drag cards to rank indicators from <strong>Most Important</strong> to
+        <strong>Least Important</strong>.
+      </p>
     </div>
   </div>
-  {% endfor %}
-</div>
-<div class="text-center mt-2">
-  <span class="badge bg-primary-subtle text-primary fs-6 px-3 py-2">⬇ Less Important (Bottom of Board)</span>
-</div>
-<div class="d-flex justify-content-between mt-3">
-  <span class="fw-bold text-danger ms-4">⬇️ Most Important</span>
-  <span class="fw-bold text-secondary me-4">Less Important ⬆️</span>
+
 </div>
 
-<!-- 💡 Right panel -->
-<div class="col-lg-4 mt-4">
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5 class="card-title">💡 SRF Weight Summary</h5>
-      <div id="summaryTable" class="small"></div>
-      <button id="saveBtn" class="btn btn-primary w-100 mt-3">💾 Save SRF Weights</button>
-    </div>
+<!-- ===== CONTROL BAR ===== -->
+<div class="srf-toolbar shadow-sm">
+
+  <!-- LEFT SIDE -->
+  <div class="toolbar-left">
+
+    <!-- Deck Button -->
+    <button id="addWhiteCard" class="deck-button">
+      <div class="deck-stack">
+        <div></div><div></div><div></div>
+      </div>
+      <span>click to add white card </span>
+    </button>
+
+    <!-- Merge + Counter COMBINED -->
+    <button id="mergeBtn" class="merge-button">
+      🔗 Merge
+      <span id="selectionCount" class="merge-count">0</span>
+    </button>
+
   </div>
+
+  <!-- RIGHT SIDE -->
+  <div class="toolbar-right">
+
+    <!-- Color Picker Professional -->
+    <label class="color-control">
+      <span>🎨 Card Color</span>
+      <input type="color" id="colorPicker" value="#ffffff">
+    </label>
+
+      <a href="{% url 'indicator_selection' project.id %}"
+   class="btn btn-outline-secondary btn-sm">
+⬅ Back to Selection
+</a>
+
+
+      <button id="restartRankingBtn"
+        class="btn btn-outline-warning btn-sm">
+🔄 Start Again
+</button>
+
+    <!-- Save Button Primary -->
+    <button id="saveRankingBtn" class="save-button">
+      💾 Save Ranking
+    </button>
+
+  </div>
+
 </div>
 
-<!-- 🎨 Styles -->
+</div>
+
+<!-- Board -->
+<div id="board"></div>
+
+</div>
+
+
+
+
 <style>
-/* ===== SRF TABLE BEAUTIFUL UI ===== */
-.srf-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
+    #board{
+    min-height:650px;
+    padding:60px;
+    border-radius:20px;
+
+    background:
+    radial-gradient(circle at center,#1f6f43 0%,#155d38 70%,#0e3f26 100%);
+
+    box-shadow:
+    inset 0 0 40px rgba(0,0,0,0.6),
+    0 10px 40px rgba(0,0,0,0.3);
+
+    display:flex;
+    flex-wrap:wrap;
+    gap:28px;
+    justify-content:center;
+    align-items:flex-start;
+    }
+
+    /* REAL CARD */
+    .srf-card{
+    width:220px;
+    height:300px;
+    border-radius:16px;
+    background:linear-gradient(#fff,#f8fafc);
+    border:1px solid #e2e8f0;
+
+    box-shadow:0 12px 25px rgba(0,0,0,.25);
+    cursor:grab;
+    position:relative;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:28px;
+    font-weight:600;
+    }
+
+    .srf-card:hover{
+    transform:translateY(-10px) rotate(var(--r,0deg)) scale(1.03);
+    }
+
+    .srf-card.selected{
+    outline:3px solid #2563eb;
+    }
+
+    /* WHITE CARD */
+    .white-card{
+    border:2px dashed #cbd5e1;
+    background:repeating-linear-gradient(45deg,#f8fafc,#f8fafc 12px,#e2e8f0 12px,#e2e8f0 24px);
+    }
+
+    /* GROUP */
+    .group-card{
+    display:flex;
+    align-items:center;
+    }
+
+    /* Fan */
+    .group-card .srf-card{
+    margin-left:-90px;
+    }
+    .group-card .srf-card:first-child{
+    margin-left:0;
+    }
+
+    /* Deck Button */
+    .deck-button{
+    background:none;
+    border:none;
+    cursor:pointer;
+    }
+    .deck-stack{
+    position:relative;
+    width:70px;
+    height:100px;
+    }
+    .deck-stack div{
+    position:absolute;
+    width:70px;
+    height:100px;
+    background:white;
+    border-radius:10px;
+    box-shadow:0 6px 15px rgba(0,0,0,.3);
+    }
+    .deck-stack div:nth-child(1){transform:rotate(-6deg);}
+    .deck-stack div:nth-child(2){transform:rotate(3deg);}
+    .deck-stack div:nth-child(3){transform:rotate(0deg);}
+
+    /* ===== HEADER ===== */
+.srf-header{
+display:flex;
+align-items:center;
+justify-content:space-between;
 }
 
-.srf-table thead th {
-  background: #f6f8fa;
-  font-weight: 600;
-  font-size: 0.85rem;
-  padding: 10px;
-  border-bottom: 1px solid #d0d7de !important;
-  text-align: center;
-  white-space: nowrap;
+.srf-title{
+display:flex;
+gap:18px;
+align-items:center;
 }
 
-.srf-table tbody td {
-  padding: 10px !important;
-  border-bottom: 1px solid #eee;
-  vertical-align: middle;
-  font-size: 0.9rem;
+.srf-step-badge{
+width:52px;
+height:52px;
+border-radius:14px;
+background:linear-gradient(135deg,#2563eb,#1d4ed8);
+color:white;
+font-weight:700;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:18px;
+box-shadow:0 8px 18px rgba(37,99,235,.35);
 }
 
-.srf-table tbody tr:nth-child(even) {
-  background: #fafbfc;
+/* ===== TOOLBAR ===== */
+.srf-toolbar{
+background:white;
+border-radius:16px;
+padding:18px 22px;
+
+display:flex;
+align-items:center;
+justify-content:space-between;
+flex-wrap:wrap;
+gap:20px;
 }
 
-/* Editable cells styling */
-.srf-editable {
-  background: #fffceb;
-  border: 1px solid #e6d784;
-  border-radius: 4px;
-  min-width: 80px;
-  cursor: text;
+.toolbar-left,
+.toolbar-right{
+display:flex;
+align-items:center;
+gap:16px;
+flex-wrap:wrap;
 }
 
-/* Wider indicator column */
-.srf-col-indicator {
-  width: 45%;
-  line-height: 1.35;
+/* ===== MERGE BUTTON WITH COUNTER ===== */
+.merge-button{
+border:none;
+background:#eef2ff;
+color:#3730a3;
+padding:10px 18px;
+border-radius:12px;
+font-weight:600;
+display:flex;
+align-items:center;
+gap:10px;
+transition:.2s;
 }
 
-/* Rank column */
-.srf-rank {
-  font-weight: 600;
-  text-align: center;
+.merge-button:hover{
+background:#e0e7ff;
+transform:translateY(-2px);
 }
 
-/* Total column highlighted */
-.srf-total {
-  background: #edf7ff;
-  border: 1px solid #b5daff;
+.merge-count{
+background:#4338ca;
+color:white;
+padding:3px 9px;
+border-radius:999px;
+font-size:13px;
+font-weight:700;
 }
 
-/* === Diagonal board layout === */
-#board {
-  min-height: 600px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 25px 30px;
-  justify-items: center;
-  align-items: start;
-  padding: 60px 40px;
-  border-radius: 16px;
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.05);
-  position: relative;
-  overflow-y: auto;
-  max-height: 80vh;
-
-  /* 🌈 Visual gradient showing importance */
-  background: linear-gradient(
-    to bottom,
-    #fff3f3 0%,       /* red tint = most important */
-    #f8fafc 50%,      /* neutral middle */
-    #e9f5ff 100%      /* blue tint = less important */
-  );
-}
-/* 🔳 White card “gap” — elegant separator between importance levels */
-/* 🔳 White card “gap” — elegant slim spacer between importance groups */
-.white-card {
-  width: 180px;  /* narrower than normal cards */
-  height: 70px;  /* shorter height for visual separation */
-  border-radius: 10px;
-  border: 2px dashed #94a3b8;
-  background: repeating-linear-gradient(
-    135deg,
-    #ffffff,
-    #ffffff 8px,
-    #f1f5f9 8px,
-    #f1f5f9 16px
-  );
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #475569;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
-  margin: 6px auto;
-  position: relative;
-  text-align: center;
+/* ===== COLOR PICKER ===== */
+.color-control{
+display:flex;
+flex-direction:column;
+font-size:12px;
+font-weight:600;
+color:#475569;
+gap:6px;
 }
 
-.white-card::before {
-  content: "⬜ White Card";
-  font-size: 0.8rem;
-  color: #64748b;
-  font-weight: 500;
-  margin-bottom: 2px;
+.color-control input{
+width:48px;
+height:38px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+box-shadow:0 4px 10px rgba(0,0,0,.15);
 }
 
-.white-card::after {
-  content: "↑ Gap in importance";
-  font-size: 0.7rem;
-  color: #94a3b8;
-  font-style: italic;
-  margin-top: 2px;
+/* ===== SAVE BUTTON ===== */
+.save-button{
+background:linear-gradient(135deg,#16a34a,#15803d);
+color:white;
+border:none;
+padding:12px 22px;
+border-radius:14px;
+font-weight:700;
+font-size:15px;
+
+box-shadow:
+0 10px 22px rgba(22,163,74,.35),
+inset 0 1px 0 rgba(255,255,255,.25);
+
+transition:.25s;
 }
 
-.white-card:hover {
-  transform: scale(1.05);
-  border-color: #64748b;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+.save-button:hover{
+transform:translateY(-3px);
+box-shadow:
+0 14px 28px rgba(22,163,74,.45);
 }
 
-/* 🔵 Highlight selected cards for merging */
-.srf-card.selected {
-  outline: 3px solid #2563eb;
-  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
-  transform: scale(1.03);
-  z-index: 10;
-}
-/* ⚖️ Equal Importance Group – stacked visual style */
-.group-card {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 12px 12px;
-  border-radius: 14px;
-  border: 2px solid #cbd5e1;
-  background: #f8fafc;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease;
-}
-
-.group-card::before {
-  content: "⚖️ Equal Importance Group";
-  position: absolute;
-  top: -12px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 0.8rem;
-  color: #475569;
-  font-weight: 600;
-}
-
-.group-card:hover {
-  transform: scale(1.02);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-}
-
-.group-card .srf-card {
-  transform: rotate(var(--r, 0deg)) translateY(0);
-  margin: 2px;
-  flex: 0 0 210px;
+.save-button:active{
+transform:translateY(0);
 }
 
 </style>
 
-<!-- 📦 SortableJS + html2canvas -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const board = document.getElementById("board");
-  const addWhiteBtn = document.getElementById("addWhiteCard");
-  const mergeBtn = document.getElementById("mergeCards");
+document.addEventListener("DOMContentLoaded",()=>{
 
-  // ✅ Enable drag and drop
-  Sortable.create(board, {
-    animation: 150,
-    ghostClass: 'dragging',
-    handle: '.srf-card, .white-card, .group-card',
-    onSort: updateCardOffsets
-  });
+const board=document.getElementById("board");
+const colorPicker=document.getElementById("colorPicker");
+const selectionBadge=document.getElementById("selectionCount");
 
-  // ✅ Add white card
-  addWhiteBtn.addEventListener("click", () => {
-    const white = document.createElement("div");
-    white.className = "white-card";
-    white.textContent = "⬜ White Card (Gap)";
-    board.appendChild(white);
-    updateCardOffsets();
-  });
+let selectedCards=new Set();
 
-  // ✅ Select cards by clicking
- // ✅ Select multiple cards (for merge) with safe click detection
-board.addEventListener("click", e => {
-  // Ignore clicks on buttons or inputs (like 🎨 or color picker)
-  if (e.target.closest("button") || e.target.closest("input")) return;
-
-  const card = e.target.closest(".srf-card");
-  if (!card) return;
-
-  // Toggle selection
-  card.classList.toggle("selected");
-
-  // Add a subtle visual pulse to confirm selection
-  if (card.classList.contains("selected")) {
-    card.style.outline = "3px solid #2563eb";
-    card.style.boxShadow = "0 0 12px rgba(37,99,235,0.4)";
-  } else {
-    card.style.outline = "";
-    card.style.boxShadow = "";
-  }
-});
-
-
-  // ✅ Merge selected indicator cards
-  mergeBtn.addEventListener("click", () => {
-    const selected = [...board.querySelectorAll(".srf-card.selected")];
-    if (selected.length < 2) {
-      alert("Select at least 2 indicator cards to merge!");
-      return;
-    }
-
-    const group = document.createElement("div");
-    group.className = "group-card";
-    group.innerHTML = `<div class="text-muted small mb-1">⚖️ Equal Importance Group</div>`;
-
-    const first = selected[0];
-    board.insertBefore(group, first);
-    selected.forEach(card => {
-      card.classList.remove("selected");
-      group.appendChild(card);
-    });
-
-    Sortable.create(group, {
-      group: "shared",
-      animation: 150,
-      handle: '.srf-card',
-      onSort: updateCardOffsets
-    });
-    updateCardOffsets();
-  });
-
-  // === Natural rotation for realism ===
-  document.querySelectorAll('.srf-card').forEach(card => {
-    const deg = (Math.random() * 3 - 1.5).toFixed(1);
-    card.style.setProperty('--r', `${deg}deg`);
-  });
-
-  // === Diagonal offset update ===
-  function updateCardOffsets() {
-    document.querySelectorAll('#board > *').forEach((el, i) => {
-      el.style.setProperty('--i', i);
-    });
-  }
-  updateCardOffsets();
-
-  const observer = new MutationObserver(updateCardOffsets);
-  observer.observe(board, { childList: true, subtree: true });
-
-  // === Color pickers and PNG download ===
-  function addColorPickers() {
-    board.querySelectorAll(".srf-card").forEach(card => {
-      if (card.querySelector(".color-btn")) return;
-
-      const colorInput = document.createElement("input");
-      colorInput.type = "color";
-      colorInput.className = "color-input";
-      colorInput.value = card.dataset.color || "#ffffff";
-      colorInput.style.display = "none";
-
-      const emojiBtn = document.createElement("button");
-      emojiBtn.className = "btn btn-sm btn-outline-secondary color-btn";
-      emojiBtn.innerHTML = "🎨";
-      emojiBtn.title = "Change card color";
-      emojiBtn.style.position = "absolute";
-      emojiBtn.style.top = "5px";
-      emojiBtn.style.right = "5px";
-      emojiBtn.style.padding = "2px 6px";
-      emojiBtn.style.fontSize = "14px";
-
-      emojiBtn.addEventListener("click", e => {
-        e.stopPropagation();
-        colorInput.click();
-      });
-
-      colorInput.addEventListener("input", e => {
-        const color = e.target.value;
-        card.style.backgroundColor = color;
-        card.dataset.color = color;
-        saveCardColors();
-      });
-
-      card.style.position = "relative";
-      card.appendChild(emojiBtn);
-      card.appendChild(colorInput);
-    });
-  }
-
-  function saveCardColors() {
-    const colors = {};
-    board.querySelectorAll(".srf-card").forEach(card => {
-      colors[card.dataset.id || card.innerText.trim()] = card.dataset.color || "#ffffff";
-    });
-    localStorage.setItem("cardColors", JSON.stringify(colors));
-  }
-
-  function loadCardColors() {
-    const saved = JSON.parse(localStorage.getItem("cardColors") || "{}");
-    board.querySelectorAll(".srf-card").forEach(card => {
-      const key = card.dataset.id || card.innerText.trim();
-      if (saved[key]) {
-        card.style.backgroundColor = saved[key];
-        card.dataset.color = saved[key];
-      }
-    });
-  }
-
-  const downloadBtn = document.createElement("button");
-  downloadBtn.className = "btn btn-success mt-3";
-  downloadBtn.innerHTML = "📸 Download Cards as PNG";
-  document.querySelector(".col-lg-4").appendChild(downloadBtn);
-
-  downloadBtn.addEventListener("click", async () => {
-    downloadBtn.disabled = true;
-    downloadBtn.innerText = "📸 Generating...";
-    try {
-      const canvas = await html2canvas(board, { scale: 2, backgroundColor: "#ffffff" });
-      const link = document.createElement("a");
-      link.download = `project_{{ project.id }}_srf_cards.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } finally {
-      downloadBtn.disabled = false;
-      downloadBtn.innerText = "📸 Download Cards as PNG";
-    }
-  });
-
-  addColorPickers();
-  loadCardColors();
-});
-</script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const saveBtn   = document.getElementById("saveBtn");
-  const summaryEl = document.getElementById("summaryTable");
-  const board     = document.getElementById("board");
-
-  // 🔍 Read the visual order from the board (same as before)
-  function getRankingData() {
-    const items = [...board.children];
-    const order = [];
-    const groups = [];
-
-    items.forEach(el => {
-      if (el.classList.contains("white-card")) {
-        order.push("gap");   // we still send gaps for the backend if needed
-      } else if (el.classList.contains("group-card")) {
-        const groupIds = [...el.querySelectorAll(".srf-card")].map(c => c.dataset.id);
-        order.push(...groupIds);
-        groups.push(groupIds);
-      } else if (el.classList.contains("srf-card")) {
-        order.push(el.dataset.id);
-        groups.push([el.dataset.id]);
-      }
-    });
-
-    return { order, groups };
-  }
-
-  // 🧮 Build an EMPTY Excel-style SRF table in the *ranking order only*
-  function renderEmptySrfTable(rankedIds) {
-  if (!rankedIds.length) {
-    summaryEl.innerHTML = `
-      <p class="text-muted small mb-0">
-        No indicators detected. Arrange cards on the board and save again.
-      </p>`;
-    return;
-  }
-
-  const rows = rankedIds.map((id, idx) => {
-    const card = document.querySelector(`.srf-card[data-id="${id}"]`);
-    const name = card ? card.querySelector("h6").innerText : `Indicator ${id}`;
-
-    return `
-      <tr data-id="${id}">
-        <td class="srf-rank">${idx + 1}</td>
-        <td class="srf-col-indicator">${name}</td>
-        <td><div class="srf-editable" contenteditable="true"></div></td>
-        <td><div class="srf-editable" contenteditable="true"></div></td>
-        <td><div class="srf-editable" contenteditable="true"></div></td>
-        <td><div class="srf-editable" contenteditable="true"></div></td>
-        <td><div class="srf-editable srf-total" contenteditable="true"></div></td>
-      </tr>`;
-  }).join("");
-
-  summaryEl.innerHTML = `
-    <h5 class="mt-3 mb-2">💡 SRF Weight Summary</h5>
-    <h6 class="text-muted mb-3">📊 Computed SRF Weights (Ranking Only)</h6>
-
-    <table class="srf-table">
-      <thead>
-        <tr>
-          <th>Rank</th>
-          <th>Indicator</th>
-          <th>Number of cards</th>
-          <th>Card positions</th>
-          <th>Sum of positions</th>
-          <th>Normalized weight</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-
-    <p class="text-muted mt-3 small">
-      The <strong>visual ranking</strong> defines ordering automatically.<br>
-      All other fields remain <strong>empty</strong> and should be filled manually,
-      following the Excel sheet logic.
-    </p>
-  `;
+/* RANDOM ROTATION */
+function randomRot(card){
+const deg=(Math.random()*4-2).toFixed(2);
+card.style.setProperty('--r',deg+"deg");
+card.style.transform=`rotate(${deg}deg)`;
 }
 
-  // 💾 Save ranking + show empty table
-  saveBtn.addEventListener("click", () => {
-    const { order, groups } = getRankingData();
+/* CREATE INDICATORS */
+{% for ind in indicators %}
+createIndicatorCard("{{ind.id}}","{{ind.name|escapejs}}");
+{% endfor %}
 
-    if (!order.length) {
-      alert("⚠️ No indicators detected! Make sure cards are on the board.");
-      return;
-    }
+function createIndicatorCard(id,name){
+const card=document.createElement("div");
+card.className="srf-card";
+card.dataset.id=id;
+card.dataset.type="indicator";
+card.innerText=name;
 
-    // Only keep actual indicators, in current visual order (ignore "gap")
-    const rankedIds = [];
-    const seen = new Set();
-    for (const item of order) {
-      if (item === "gap") continue;
-      if (!seen.has(item)) {
-        seen.add(item);
-        rankedIds.push(item);
-      }
-    }
+randomRot(card);
 
-    // 🧩 Build Excel-style table with ONLY ranking auto-filled
-    renderEmptySrfTable(rankedIds);
+card.onclick=()=>toggleSelect(card);
+board.appendChild(card);
+}
 
-    // 🔐 Still send full order + groups to backend (no weights)
-    fetch("{% url 'indicator_ranking_view' project.id %}", {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": "{{ csrf_token }}",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ order, groups }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "success") {
-          alert("✅ Ranking saved successfully! Fill the SRF table manually following the Excel sheet.");
-        } else {
-          alert("⚠️ Error saving ranking: " + (data.message || "Unknown issue"));
-          console.error(data);
-        }
-      })
-      .catch(err => {
-        console.error("Network error:", err);
-        alert("❌ Network error. Please try again.");
-      });
-  });
+/* WHITE CARD */
+document.getElementById("addWhiteCard").onclick=()=>{
+const card=document.createElement("div");
+card.className="srf-card white-card";
+card.dataset.type="gap";
+card.innerText="White Card";
+board.appendChild(card);
+}
+
+/* SELECT */
+function toggleSelect(card){
+card.classList.toggle("selected");
+card.classList.contains("selected")?
+selectedCards.add(card):selectedCards.delete(card);
+selectionBadge.innerText=selectedCards.size+" selected";
+}
+
+/* MERGE */
+document.getElementById("mergeBtn").onclick=()=>{
+if(selectedCards.size<2)return alert("Select 2+ cards");
+
+const group=document.createElement("div");
+group.className="group-card";
+group.dataset.type="group";
+
+selectedCards.forEach(c=>{
+c.classList.remove("selected");
+group.appendChild(c);
 });
-</script>
 
+board.appendChild(group);
+fan(group);
+
+selectedCards.clear();
+selectionBadge.innerText="0 selected";
+}
+
+function fan(group){
+const cards=[...group.children];
+cards.forEach((c,i)=>{
+const spread=(i-(cards.length-1)/2)*6;
+c.style.transform=`rotate(${spread}deg)`;
+});
+}
+
+/* DEAL ANIMATION */
+setTimeout(()=>{
+document.querySelectorAll(".srf-card").forEach((c,i)=>{
+c.style.opacity=0;
+c.style.transform="translateY(-200px)";
+setTimeout(()=>{
+c.style.transition="all .4s ease";
+c.style.opacity=1;
+randomRot(c);
+},i*120);
+});
+},200);
+
+/* SORT */
+new Sortable(board,{
+animation:200,
+ghostClass:'dragging'
+});
+
+/* SAVE */
+/* SAVE */
+document.getElementById("saveRankingBtn").onclick=()=>{
+    const order=[];
+    const groups=[];
+
+    [...board.children].forEach(el=>{
+        // 1. Check for White Cards (Gaps)
+        if(el.dataset.type==="gap") {
+            order.push("gap");
+        }
+        // 2. Check for Merged Groups (Added class fallback for safety with SortableJS)
+        else if(el.classList.contains("group-card") || el.dataset.type==="group"){
+            const g=[...el.querySelectorAll(".srf-card")].map(x=>x.dataset.id);
+            if (g.length > 0) {
+                groups.push(g);
+                order.push(g); // <--- CRITICAL FIX: Pushing the array natively, no spread operator!
+            }
+        }
+        // 3. Single Cards
+        else if(el.dataset.id) {
+            order.push(el.dataset.id);
+        }
+    });
+
+    fetch("{% url 'save_indicator_ranking' project.id %}",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json",
+            "X-CSRFToken":"{{ csrf_token }}"
+        },
+        body:JSON.stringify({order,groups})
+    })
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.status === "success"){
+            window.location.href = "{% url 'simos_manual' project.id %}";
+        }else{
+            alert("Save failed");
+        }
+    });
+};
+
+});   // close DOMContentLoaded
+
+</script>
 
 {% endblock %}

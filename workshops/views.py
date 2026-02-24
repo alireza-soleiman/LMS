@@ -13,8 +13,8 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST , require_http_methods
-from django.views.decorators.csrf import csrf_exempt
-from .forms import StakeholderForm, ProblemForm, IndicatorForm , ProjectCreateForm
+from django.views.decorators.csrf import ensure_csrf_cookie
+from .forms import StakeholderForm, ProblemForm, IndicatorForm , ProjectCreateForm , ObjectiveForm
 from .models import (
     Project,
     Problem,
@@ -25,7 +25,13 @@ from .models import (
     SWOTItem,
     QSortResult,
 )
+from .utils.simos import simos_from_ranking
 
+def _get_project_for_user(request, project_id: int) -> Project:
+    """Fetch a project with ownership enforcement for students; staff can access all."""
+    if request.user.is_staff:
+        return get_object_or_404(Project, id=project_id)
+    return get_object_or_404(Project, id=project_id, owner=request.user)
 
 # -------------------------
 # Stakeholder Views
@@ -214,8 +220,6 @@ def problem_tree_data(request, project_id):
 # -------------------------
 # Objective Tree Views (Workshop 2.3)
 # -------------------------
-from .models import Objective
-from .forms import ObjectiveForm
 
 @login_required
 def objective_tree_view(request, project_id):
@@ -325,23 +329,37 @@ def delete_objective(request, objective_id):
 # -------------------------
 # Workshop List / Projects
 # -------------------------
-
 @login_required
 def workshop_list_view(request, project_id):
-    project = get_object_or_404(Project, pk=project_id, owner=request.user)
+    project = _get_project_for_user(request, project_id)
+
+    overview = project.overview or {}
+
+    def box_text(key: str) -> str:
+      v = overview.get(key)
+      if isinstance(v, dict):
+          return (v.get("text") or "").strip()
+      return ""
+
+    # ✅ Define what "Workshop 1 complete" means
+    # (You can tighten this rule later; for now A1+B1 is a good minimum)
+    overview_done = bool(box_text("A1")) and bool(box_text("B1"))
+
     ws_flags = {
-        'ws1': project.stakeholders.exists(),
-        'ws2': project.problems.exists(),
-        'ws3': project.indicators.filter(accepted=True).exists(),
-        'ws4': project.swot_items.exists(),
+        "overview": overview_done,
+        "stakeholders": project.stakeholders.exists(),
+        "problem_tree": project.problems.exists(),
+        "objective_tree": project.objectives.exists(),
+        "indicator_selection": project.indicators.filter(accepted=True).exists(),
+        "indicator_ranking": bool(getattr(project, "indicator_ranking_order", None)),
+        "swot": project.swot_items.exists(),
+        "scenario": bool((project.scenario_data or {}).get("qsorts")) or bool((project.scenario_data or {}).get("scenarios")),
     }
-    return render(request, 'workshops/workshop_list.html', {
-        'project': project,
-        'ws_flags': ws_flags,
+
+    return render(request, "workshops/workshop_list.html", {
+        "project": project,
+        "ws_flags": ws_flags,
     })
-
-
-
 # -------------------------
 # Indicator Selection & SRF
 # -------------------------
@@ -555,6 +573,71 @@ def save_indicator_selections(request, project_id):
     return JsonResponse({"status": "success", "count": len(selected_ids)})
 
 
+
+@login_required
+@require_POST
+def save_indicator_ranking(request, project_id):
+    project = _get_project_for_user(request, project_id)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        order = data.get("order", [])
+        groups = data.get("groups", [])
+
+        # ✅ SAVE TO DATABASE
+        project.indicator_ranking_order = order
+        project.indicator_ranking_groups = groups
+        project.save()
+
+        return JsonResponse({
+            "status": "success",
+            "saved_order_length": len(order),
+            "groups_count": len(groups)
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=400)
+
+@login_required
+def simos_manual_page(request, project_id):
+    project = _get_project_for_user(request, project_id)
+
+    # 1. Get BOTH Order and Groups
+    ranking = project.indicator_ranking_order
+    groups = project.indicator_ranking_groups  # <--- NEW: Get the groups
+
+    # 2. Pass both to the function
+    simos = simos_from_ranking(ranking, groups)  # <--- NEW: Pass groups here
+
+    # Map indicator names
+    indicators_map = {
+        str(i.id): i.name
+        for i in project.indicators.all()
+    }
+
+    indicators = []
+    for row in simos["indicators"]:
+        # Safety check: ensure ID exists in map
+        name = indicators_map.get(str(row["id"]), f"Indicator {row['id']}")
+
+        indicators.append({
+            "id": row["id"],
+            "name": name,
+            "position": row["position"],
+            "raw": row["raw_weight"],
+            "normalized": round(row["normalized_weight"], 4)
+        })
+
+    return render(request, "workshops/simos_manual.html", {
+        "project": project,
+        "indicators": indicators,
+        "total": simos["total_raw"]
+    })
+
 # -------------------------
 # SWOT Views
 # -------------------------
@@ -686,9 +769,9 @@ def create_project_view(request):
 
 
 @login_required
-@csrf_exempt  # TEMPORARY to test saving; we’ll secure later
+@ensure_csrf_cookie
 def project_overview_view(request, project_id):
-    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    project = _get_project_for_user(request, project_id)
 
     # Initialize overview dict if empty
     if not project.overview:
@@ -706,15 +789,51 @@ def project_overview_view(request, project_id):
     if request.method == "POST":
         try:
             data = json.loads(request.body.decode("utf-8"))
-            box = data.get("box")
-            text = data.get("text")
 
-            if box in project.overview:
-                project.overview[box]["text"] = text
-                project.save()
+            def save_overview():
+                # ✅ force JSONField dirty + save only overview
+                project.overview = dict(project.overview)
+                project.save(update_fields=["overview"])
+
+            # -------------------------
+            # Bulk save (Save & Continue)
+            # -------------------------
+            if data.get("all") is True:
+                values = data.get("values", {})
+                if not isinstance(values, dict):
+                    return JsonResponse({"status": "error", "message": "Invalid values payload"}, status=400)
+
+                for box, text in values.items():
+                    if box in project.overview and isinstance(project.overview.get(box), dict):
+                        project.overview[box]["text"] = text
+
+                sdg_ids = data.get("sdg_ids")
+                if sdg_ids is not None:
+                    project.overview.setdefault("D2_SDGS", {"title": "Selected SDGs", "text": ""})
+                    project.overview["D2_SDGS"]["text"] = str(sdg_ids).strip()
+
+                save_overview()
                 return JsonResponse({"status": "ok"})
-            else:
-                return JsonResponse({"status": "error", "message": "Invalid box key"}, status=400)
+
+            # -------------------------
+            # Single box save
+            # -------------------------
+            box = data.get("box")
+            text = data.get("text", "")
+
+            if box in project.overview and isinstance(project.overview.get(box), dict):
+                project.overview[box]["text"] = text
+
+                sdg_ids = data.get("sdg_ids")
+                if sdg_ids is not None:
+                    project.overview.setdefault("D2_SDGS", {"title": "Selected SDGs", "text": ""})
+                    project.overview["D2_SDGS"]["text"] = str(sdg_ids).strip()
+
+                save_overview()
+                return JsonResponse({"status": "ok"})
+
+            return JsonResponse({"status": "error", "message": "Invalid box key"}, status=400)
+
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
@@ -722,6 +841,7 @@ def project_overview_view(request, project_id):
 
 
 
+#//workshop6//
 def get_scenario_data(project: Project) -> dict:
     data = project.scenario_data or {}
     data.setdefault("actions", [])
@@ -1108,8 +1228,7 @@ def _kmeans(qsort_vectors, k=3, max_iter=25):
     return assignments
 
 
-import csv
-from django.http import HttpResponse
+
 
 
 def run_scenario_extraction(data):

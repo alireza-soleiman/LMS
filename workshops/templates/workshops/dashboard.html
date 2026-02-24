@@ -65,9 +65,9 @@
 <div class="container py-4">
   <div class="dashboard-header">
     <h2>Welcome, {{ user.username }} 👋</h2>
-    {% if not user.is_staff %}
-      <a href="{% url 'create_project' %}" class="btn btn-success">+ Create New Project</a>
-    {% endif %}
+    {% if not user.is_staff and not project_cards %}
+  <a href="{% url 'create_project' %}" class="btn btn-success">+ Create Your Project</a>
+{% endif %}
   </div>
 
   {% if project_cards %}

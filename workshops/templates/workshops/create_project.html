@@ -71,6 +71,11 @@
   <h2>🧱 Step 1 of 4 — Create Your Project</h2>
   <p class="progress-text">Set up your project details and team members to begin.</p>
   <hr class="mb-4">
+    <div class="alert alert-info">
+  <strong>Tip:</strong> You’ll complete 8 workshops inside this project. You can edit details later.
+</div>
+
+<a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mb-3">← Back to Dashboard</a>
 
   <form method="post" id="createProjectForm">
     {% csrf_token %}
@@ -138,6 +143,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   addBtn.addEventListener("click", () => addMemberRow());
+
+  addMemberRow();
+
+  document.getElementById("createProjectForm").addEventListener("submit", (e) => {
+  updateHiddenInput();
+  const members = JSON.parse(membersInput.value || "[]");
+  if (members.length === 0) {
+    e.preventDefault();
+    alert("Please add at least one team member.");
+  }
+});
+
 });
 </script>
 {% endblock %}

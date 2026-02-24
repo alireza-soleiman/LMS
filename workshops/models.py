@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import JSONField
 
 
 class Project(models.Model):
@@ -8,12 +9,17 @@ class Project(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    indicator_ranking_order = JSONField(default=list, blank=True)
+    indicator_ranking_groups = JSONField(default=list, blank=True)
+
 
     # 🧠 Store Workshop 0 / 1 data (overview, etc.)
     overview = models.JSONField(default=dict, blank=True)
 
     # 🌳 Workshop 2.3 – Objective Tree (already in use)
     objective_tree = models.JSONField(default=dict, blank=True)
+
+
 
     # 🧩 Workshop 5 – Scenario Building (Q-Methodology)
     # All actions, q-sorts, scenarios will be stored here as JSON

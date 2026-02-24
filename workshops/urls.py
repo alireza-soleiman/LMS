@@ -32,10 +32,16 @@ urlpatterns = [
     path("project/<int:project_id>/indicators/save/", views.save_indicator_selections, name="save_indicator_selections"),
     path("indicator/toggle/<int:indicator_id>/", views.toggle_indicator_accept, name="toggle_indicator_accept"),
 
+
     # WORKSHOP 3.2 — Indicator Ranking (SRF)
     path("project/<int:project_id>/ranking/", ranking_page_view, name="indicator_ranking"),
     path("project/<int:project_id>/ranking/save/", views.indicator_ranking_view, name="indicator_ranking_view"),
     path("project/<int:project_id>/ranking/download/", views.download_indicators_csv, name="download_indicators_csv"),
+    path("project/<int:project_id>/save-ranking/", views.save_indicator_ranking, name="save_indicator_ranking"),
+
+    path("project/<int:project_id>/simos-manual/", views.simos_manual_page,name="simos_manual"),
+
+
 
     # WORKSHOP 4 — SWOT Analysis
     path("project/<int:project_id>/swot/", swot_analysis_view, name="swot_analysis"),
