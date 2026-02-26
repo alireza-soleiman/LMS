@@ -141,7 +141,7 @@ def delete_stakeholder(request, stakeholder_id):
 # -------------------------
 @login_required
 def problem_tree_view(request, project_id):
-    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    project = _get_project_for_user(request, project_id)
 
     if request.method == "POST":
         form = ProblemForm(request.POST, project=project)
@@ -149,6 +149,13 @@ def problem_tree_view(request, project_id):
             new_problem = form.save(commit=False)
             new_problem.project = project
             new_problem.save()
+            if not new_problem.color:
+                if new_problem.problem_type == "CORE":
+                    new_problem.color = "#fee2e2"
+                elif new_problem.problem_type == "CAUSE":
+                    new_problem.color = "#dbeafe"
+                elif new_problem.problem_type == "EFFECT":
+                    new_problem.color = "#dcfce7"
             return redirect("problem_tree", project_id=project.id)
     else:
         form = ProblemForm(project=project)
@@ -172,13 +179,31 @@ def delete_problem(request, problem_id):
     problem.delete()
     return redirect("problem_tree", project_id=project_id)
 
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
 
+@login_required
+@require_POST
+def update_problem_color(request, problem_id):
+    problem = get_object_or_404(Problem, id=problem_id)
+    if problem.project.owner != request.user and not request.user.is_staff:
+        return JsonResponse({"status": "error", "message": "Permission denied"}, status=403)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        color = (data.get("color") or "").strip()
+        # allow empty to clear
+        problem.color = color or None
+        problem.save(update_fields=["color"])
+        return JsonResponse({"status": "ok"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 @login_required
 def problem_tree_data(request, project_id):
     """
     API: return hierarchical problem tree JSON for D3.
     """
-    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    project = _get_project_for_user(request, project_id)
     all_problems = Problem.objects.filter(project=project)
 
     core_problem = all_problems.filter(problem_type="CORE").first()
