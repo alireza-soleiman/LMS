@@ -20,6 +20,7 @@ urlpatterns = [
     path("project/<int:project_id>/problem-tree/", views.problem_tree_view, name="problem_tree"),
     path("api/project/<int:project_id>/problem-data/", views.problem_tree_data, name="problem_tree_data_api"),
     path("problem/delete/<int:problem_id>/", views.delete_problem, name="delete_problem"),
+    path("problem/<int:problem_id>/color/", views.update_problem_color, name="update_problem_color"),
 
     # WORKSHOP 2.3 — objective Tree
     # WORKSHOP 2.3 — Objective Tree
