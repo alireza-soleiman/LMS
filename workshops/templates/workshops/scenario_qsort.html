@@ -24,8 +24,20 @@
 
   <div class="mb-4">
       <h2>Workshop 5 — Stage 2: Q-Sorting</h2>
-      <p class="text-muted mb-0">Drag actions from the unsorted pile to the grid below. Save when finished.</p>
+
+      <p class="text-muted mb-0">
+        Drag actions from the unsorted pile to the grid below. Save when finished.
+      </p>
+
+      <div class="d-flex justify-content-end gap-2 flex-wrap mt-2">
+          <a href="{% url 'workshop_list' project.id %}"
+             class="btn btn-outline-secondary">
+             ← Back to Project Home
+          </a>
+      </div>
+
   </div>
+</div>
 
   <div class="card mb-4 shadow-sm bg-light border-0">
     <div class="card-body row g-3">
