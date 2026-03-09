@@ -25,6 +25,7 @@ from .models import (
     MasterIndicator,
     SWOTItem,
     QSortResult,
+    IndicatorData,
 )
 from .utils.simos import simos_from_ranking
 
@@ -40,7 +41,8 @@ def _get_project_for_user(request, project_id: int) -> Project:
 @login_required
 def stakeholder_list(request, project_id):
     """Render stakeholder page and handle adding new stakeholders."""
-    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    # Use the helper for consistent access control
+    project = _get_project_for_user(request, project_id)
 
     if request.method == "POST":
         form = StakeholderForm(request.POST)
@@ -48,7 +50,17 @@ def stakeholder_list(request, project_id):
             new_stakeholder = form.save(commit=False)
             new_stakeholder.project = project
             new_stakeholder.save()
+
+            # ✅ NEW: Check if this was an AJAX request from the JavaScript
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({"status": "ok"})
+
+            # Fallback for standard HTML form submission
             return redirect("stakeholder_list", project_id=project.id)
+        else:
+            # ✅ NEW: Handle validation errors for AJAX
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({"status": "error", "errors": form.errors}, status=400)
     else:
         form = StakeholderForm()
 
@@ -59,7 +71,6 @@ def stakeholder_list(request, project_id):
         "workshops/stakeholder_list.html",
         {"project": project, "form": form, "stakeholders": stakeholders},
     )
-
 
 @login_required
 def download_stakeholders_csv(request, project_id):
@@ -731,7 +742,6 @@ def save_swot_entry(request, project_id):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-
 @login_required
 def dashboard_view(request):
     """
@@ -743,6 +753,11 @@ def dashboard_view(request):
         projects = Project.objects.all().order_by('title')
     else:
         projects = Project.objects.filter(owner=request.user).order_by('title')
+
+    # 🚀 NEW: Automatically skip the dashboard if the user only has 1 project
+    if projects.count() == 1:
+        single_project = projects.first()
+        return redirect('workshop_list', project_id=single_project.id)
 
     # compute a simple progress score per project (0-100)
     project_cards = []
@@ -766,7 +781,6 @@ def dashboard_view(request):
         })
 
     return render(request, 'workshops/dashboard.html', {'project_cards': project_cards})
-
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -1391,6 +1405,39 @@ def scenario_results_view(request, project_id):
     actions = data.get("actions", [])
     scenarios = data.get("scenarios", [])
 
+    # ... existing code ...
+    actions = data.get("actions", [])
+    scenarios = data.get("scenarios", [])
+
+    # ✅ NEW: Dynamic Idealized Q-Sort Pyramid Calculation
+    for s in scenarios:
+        pyramid_dict = {}
+
+        # Group actions by their rounded Z-score
+        for action in s.get("ranking", []):
+            score_val = int(round(action["score"]))
+            if score_val not in pyramid_dict:
+                pyramid_dict[score_val] = []
+            pyramid_dict[score_val].append(action)
+
+        if pyramid_dict:
+            # Find the highest absolute score to make the pyramid perfectly symmetric (e.g., -2 to +2)
+            max_abs = max(abs(min(pyramid_dict.keys())), abs(max(pyramid_dict.keys())))
+
+            pyramid = []
+            # Build columns from -max_abs to +max_abs
+            for score in range(-max_abs, max_abs + 1):
+                pyramid.append({
+                    "score": score,
+                    # Sort actions alphabetically inside their specific bucket for neatness
+                    "actions": sorted(pyramid_dict.get(score, []), key=lambda x: x["text"])
+                })
+            s["pyramid"] = pyramid
+        else:
+            s["pyramid"] = []
+
+
+
     return render(
         request,
         "workshops/scenario_results.html",
@@ -1624,3 +1671,63 @@ def final_review_pdf(request, project_id):
     c.showPage()
     c.save()
     return resp
+
+# -------------------------
+# workshop 4.1 indicator analys
+# -------------------------
+
+@login_required
+def indicator_analysis_view(request, project_id):
+    """Workshop 4.1: Allows users to upload data images for accepted indicators."""
+    project = _get_project_for_user(request, project_id)
+
+    # Fetch indicators that the user accepted in WS 3.1
+    selected_indicators = project.indicators.filter(accepted=True) if hasattr(project, 'indicators') else []
+
+    # Create a dictionary of already uploaded images
+    uploaded_data = {
+        str(data.indicator_id): data.data_image.url if data.data_image else None
+        for data in IndicatorData.objects.filter(project=project)
+    }
+
+    # ✅ NEW: Attach the image URL directly to the indicator object
+    for ind in selected_indicators:
+        ind.current_image = uploaded_data.get(str(ind.id))
+
+    return render(
+        request,
+        "workshops/indicator_analysis.html",
+        {
+            "project": project,
+            "indicators": selected_indicators,
+            # We don't even need to pass uploaded_data to the template anymore!
+        }
+    )
+
+@login_required
+@require_POST
+def upload_indicator_image(request, project_id):
+    project = _get_project_for_user(request, project_id)
+
+    indicator_id = request.POST.get('indicator_id')
+    indicator_name = request.POST.get('indicator_name')
+    image_file = request.FILES.get('data_image')
+
+    if not indicator_id or not image_file:
+        return JsonResponse({"status": "error", "message": "Missing file or ID"}, status=400)
+
+    # Update or create the record
+    indicator_data, created = IndicatorData.objects.get_or_create(
+        project=project,
+        indicator_id=indicator_id,
+        defaults={'indicator_name': indicator_name}
+    )
+
+    # Save the new image
+    indicator_data.data_image = image_file
+    indicator_data.save()
+
+    return JsonResponse({
+        "status": "success",
+        "image_url": indicator_data.data_image.url
+    })

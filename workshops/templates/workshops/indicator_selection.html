@@ -5,41 +5,63 @@
 {% block title %}Indicator Selection — {{ project.title }}{% endblock %}
 
 {% block content %}
+<style>
+  body { background: #f8fafc; }
+
+  /* Toast Notification Styling */
+  .save-toast {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: #16a34a;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(15px);
+    transition: all 0.4s ease;
+    z-index: 9999;
+    font-weight: 500;
+  }
+  .save-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+
 <div class="container py-4">
-  <h2 class="mb-3">WS3 — Indicator Selection (Delphi)</h2>
+  <h2 class="mb-3 fw-bold text-dark">WS3 — Indicator Selection (Delphi)</h2>
   <p class="text-muted">
     Browse indicators by category. Select up to <strong>15</strong> indicators that fit your project.
   </p>
-    <div class="d-flex gap-2 flex-wrap">
-      <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary">← Back to Project Home</a>
-    <a href="{% url 'indicator_ranking' project.id %}"
-       class="btn btn-success"
-       id="proceedBtn">
+
+  <div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary">← Back to Project Home</a>
+    <a href="{% url 'indicator_ranking' project.id %}" class="btn btn-success" id="proceedBtn">
        Proceed to SRF Ranking →
     </a>
+  </div>
 
-        </div> <br>
-  <!-- Summary panel -->
-  <div class="card mb-4 shadow-sm">
+  <div class="card mb-4 shadow-sm border-0 rounded-4">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="card-title mb-0">Selected Indicators Summary</h5>
-        <button class="btn btn-primary btn-sm" id="saveSelectionsBtn">💾 Save Selections</button>
+        <h5 class="card-title fw-bold mb-0">Selected Indicators Summary</h5>
+        <button class="btn btn-primary btn-sm rounded-pill px-3 fw-medium" id="saveSelectionsBtn">💾 Save Selections</button>
       </div>
 
-      <div class="text-muted small mb-2">
+      <div class="text-muted small mb-3">
         Your selections are saved locally — click “Save Selections” to finalize.
       </div>
 
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <small class="text-muted">Selected: <span id="selectedCount">0</span> / 15</small>
+        <small class="text-muted fw-semibold">Selected: <span id="selectedCount">0</span> / 15</small>
       </div>
 
-      <div class="progress mb-3" style="height: 8px;">
-        <div id="selectionProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+      <div class="progress mb-4" style="height: 8px; border-radius: 10px; background-color: #e2e8f0;">
+        <div id="selectionProgress" class="progress-bar bg-success" role="progressbar" style="width: 0%; border-radius: 10px;"></div>
       </div>
 
-</div>
       <table class="table table-sm table-bordered mb-0" id="selectedTable" style="display:none;">
         <thead class="table-light">
           <tr>
@@ -54,12 +76,11 @@
     </div>
   </div>
 
-  <!-- Nested accordion -->
-  <div class="accordion" id="mainAccordion">
+  <div class="accordion shadow-sm" id="mainAccordion">
     {% for main_token, main in hierarchy.items %}
-    <div class="accordion-item mb-2">
+    <div class="accordion-item mb-2 border-0 rounded-3 overflow-hidden">
       <h2 class="accordion-header">
-        <button class="accordion-button collapsed" type="button"
+        <button class="accordion-button collapsed fw-semibold bg-white" type="button"
                 data-bs-toggle="collapse"
                 data-bs-target="#collapseMain{{ forloop.counter }}">
           {{ main.full }}
@@ -67,13 +88,13 @@
       </h2>
 
       <div id="collapseMain{{ forloop.counter }}" class="accordion-collapse collapse">
-        <div class="accordion-body">
+        <div class="accordion-body bg-light">
 
           <div class="accordion">
             {% for sub_token, sub in main.subs.items %}
-            <div class="accordion-item mb-1">
+            <div class="accordion-item mb-1 border-0">
               <h2 class="accordion-header">
-                <button class="accordion-button collapsed"
+                <button class="accordion-button collapsed py-2"
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="#collapseSub{{ forloop.parentloop.counter }}{{ forloop.counter }}">
@@ -86,34 +107,37 @@
                 <div class="accordion-body p-0">
 
                   {% if sub.indicators %}
-                  <table class="table table-striped m-0">
-                    <thead class="table-dark">
-                      <tr>
-                        <th style="width:70px;">Accept</th>
-                        <th>Indicator</th>
-                        <th>Criterion</th>
-                        <th>Description</th>
-                        <th>Unit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for ind in sub.indicators %}
-                      <tr>
-                        <td class="text-center">
-                          <input type="checkbox"
-                                 data-id="{{ ind.id }}"
-                                 {% if ind.accepted %}checked{% endif %}>
-                        </td>
-                        <td>{{ ind.name }}</td>
-                        <td>{{ ind.criterion }}</td>
-                        <td>{{ ind.description|truncatewords:25 }}</td>
-                        <td>{{ ind.unit }}</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+                  <div class="table-responsive">
+                    <table class="table table-striped table-hover m-0 align-middle">
+                      <thead class="table-dark">
+                        <tr>
+                          <th style="width:70px;" class="text-center">Accept</th>
+                          <th>Indicator</th>
+                          <th>Criterion</th>
+                          <th>Description</th>
+                          <th>Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for ind in sub.indicators %}
+                        <tr>
+                          <td class="text-center">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   data-id="{{ ind.id }}"
+                                   {% if ind.accepted %}checked{% endif %}>
+                          </td>
+                          <td class="fw-medium">{{ ind.name }}</td>
+                          <td><span class="badge bg-secondary">{{ ind.criterion }}</span></td>
+                          <td class="small text-muted">{{ ind.description|truncatewords:25 }}</td>
+                          <td>{{ ind.unit }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
                   {% else %}
-                  <div class="px-3 py-2 text-muted">No indicators under this subcategory.</div>
+                  <div class="px-3 py-3 text-muted text-center">No indicators under this subcategory.</div>
                   {% endif %}
 
                 </div>
@@ -128,18 +152,23 @@
     {% endfor %}
   </div>
 
-  <hr class="my-4">
+  <hr class="my-5">
 
-  <h5>Add a Custom Indicator</h5>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" name="add_indicator" class="btn btn-primary">
-      Add Indicator
-    </button>
-  </form>
+  <div class="card shadow-sm border-0 rounded-4">
+    <div class="card-body p-4">
+      <h5 class="fw-bold mb-3">Add a Custom Indicator</h5>
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" name="add_indicator" class="btn btn-primary rounded-pill px-4 mt-2">
+          + Add Indicator
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 
-
+<div class="save-toast" id="saveToast"></div>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -162,6 +191,20 @@ document.addEventListener("DOMContentLoaded", function() {
   const progressBar = document.getElementById("selectionProgress");
   const saveBtn = document.getElementById("saveSelectionsBtn");
   const proceedBtn = document.getElementById("proceedBtn");
+  const toast = document.getElementById("saveToast");
+
+  /* ---------------- HELPER: TOAST ---------------- */
+  function showToast(msg, type="success") {
+    if (!toast) return;
+    toast.textContent = msg;
+    // Set color based on type
+    if (type === "success") toast.style.background = "#16a34a"; // Green
+    else if (type === "warning") toast.style.background = "#f59e0b"; // Amber/Orange
+    else if (type === "error") toast.style.background = "#dc3545"; // Red
+
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2500);
+  }
 
   /* ---------------- LOAD CACHE ---------------- */
   const saved = localStorage.getItem(storageKey);
@@ -181,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
       if (cb.checked) {
         if (selectedIndicators.size >= maxSelect) {
-          alert("You can select up to 15 indicators only.");
+          showToast("You can select up to 15 indicators only.", "warning");
           cb.checked = false;
           return;
         }
@@ -203,11 +246,11 @@ document.addEventListener("DOMContentLoaded", function() {
     selectedIndicators.forEach((data, id) => {
       selectedBody.insertAdjacentHTML("beforeend", `
         <tr data-id="${id}">
-          <td>${data.name}</td>
-          <td>${data.crit}</td>
+          <td class="fw-medium">${data.name}</td>
+          <td><span class="badge bg-secondary">${data.crit}</span></td>
           <td>${data.unit}</td>
           <td class="text-center">
-            <button class="btn btn-sm btn-outline-danger remove-btn">✖</button>
+            <button class="btn btn-sm btn-outline-danger remove-btn py-0 px-2" title="Remove">✖</button>
           </td>
         </tr>
       `);
@@ -269,6 +312,11 @@ document.addEventListener("DOMContentLoaded", function() {
   saveBtn.addEventListener("click", () => {
     const ids = Array.from(selectedIndicators.keys());
 
+    // Visual feedback on button
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = "Saving...";
+    saveBtn.disabled = true;
+
     fetch(saveUrl, {
       method: "POST",
       headers: {
@@ -279,15 +327,22 @@ document.addEventListener("DOMContentLoaded", function() {
     })
     .then(res => res.json())
     .then(data => {
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+
       if (data.status === "success") {
-        alert(`Saved ${data.count} indicators successfully!`);
+        showToast(`Saved ${data.count} indicators successfully!`, "success");
         dirty = false;
         updateProceedState();
       } else {
-        alert("Error saving selections.");
+        showToast("Error saving selections.", "error");
       }
     })
-    .catch(() => alert("Network error."));
+    .catch(() => {
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+      showToast("Network connection error.", "error");
+    });
   });
 
   /* ---------------- RESTORE CHECKBOXES ---------------- */

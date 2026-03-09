@@ -5,100 +5,123 @@
 <style>
   body {
     background: #f8fafc;
-    font-family: "Inter", sans-serif;
   }
   .create-container {
     max-width: 850px;
     margin: 2rem auto;
     background: #fff;
     border-radius: 1rem;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
     padding: 2.5rem 3rem;
-    animation: fadeIn 0.6s ease-in-out;
+    animation: fadeIn 0.4s ease-in-out;
   }
-  h2 {
-    font-weight: 600;
-    color: #2c3e50;
-  }
-  .progress-text {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 1.2rem;
+  .create-title {
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.5px;
   }
   .form-control {
     border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+  }
+  .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
   }
   .btn-primary {
-    background-color: #0056b3;
-    border: none;
-    border-radius: 0.5rem;
+    border-radius: 50rem; /* Pill shape to match dashboard */
     font-weight: 500;
-    padding: 0.7rem 2rem;
+    padding: 0.7rem 2.5rem;
   }
-  .btn-primary:hover { background-color: #004291; }
   .member-row {
     display: flex;
     gap: 0.5rem;
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.75rem;
   }
   .member-row input {
     flex: 1;
   }
   .remove-btn {
     border: none;
-    background: #f8d7da;
-    color: #a33;
-    border-radius: 0.4rem;
-    padding: 0 0.7rem;
-    font-weight: 600;
-  }
-  .remove-btn:hover { background: #f5c2c7; }
-  .add-btn {
-    border: 1px solid #0056b3;
-    color: #0056b3;
+    background: #fee2e2;
+    color: #dc3545;
     border-radius: 0.5rem;
-    padding: 0.4rem 1.2rem;
-    font-weight: 500;
+    padding: 0 0.8rem;
+    font-weight: 600;
+    transition: background-color 0.2s;
   }
-  .add-btn:hover { background: #0056b3; color: white; }
+  .remove-btn:hover { background: #fca5a5; }
+  .add-btn {
+    border: 1px dashed #0d6efd;
+    background: transparent;
+    color: #0d6efd;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.2rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .add-btn:hover {
+    background: #eff6ff;
+  }
+
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 768px) {
+    .member-row {
+      flex-direction: column;
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 0.5rem;
+    }
+    .remove-btn {
+      padding: 0.5rem;
+      width: 100%;
+    }
   }
 </style>
 
 <div class="create-container">
-  <h2>🧱 Step 1 of 4 — Create Your Project</h2>
-  <p class="progress-text">Set up your project details and team members to begin.</p>
-  <hr class="mb-4">
-    <div class="alert alert-info">
-  <strong>Tip:</strong> You’ll complete 8 workshops inside this project. You can edit details later.
-</div>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="create-title mb-0">✨ Create Your Project</h2>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">← Back</a>
+  </div>
+  <p class="text-muted mb-4">Set up your project details and add your team members to begin.</p>
 
-<a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mb-3">← Back to Dashboard</a>
+  <div class="alert alert-info border-0 bg-light text-dark shadow-sm rounded-3 mb-4">
+    <strong>💡 Tip:</strong> You’ll complete 8 workshops inside this project. You can always edit these details later.
+  </div>
 
   <form method="post" id="createProjectForm">
     {% csrf_token %}
 
-    <div class="mb-3">
-      <label for="id_title" class="form-label">Project Title</label>
-      <input type="text" name="title" id="id_title" class="form-control" placeholder="e.g. Interactive Web Pages" required>
+    <div class="mb-4">
+      <label for="id_title" class="form-label fw-semibold">Project Title</label>
+      <input type="text" name="title" id="id_title" class="form-control form-control-lg text-primary fw-medium" placeholder="e.g. Interactive Web Pages" required>
     </div>
 
-    <div class="mb-3">
-      <label for="id_description" class="form-label">Project Description</label>
+    <div class="mb-4">
+      <label for="id_description" class="form-label fw-semibold">Project Description</label>
       <textarea name="description" id="id_description" class="form-control" rows="3" placeholder="Briefly describe your project goals..."></textarea>
     </div>
 
-    <div class="mb-3">
-      <label class="form-label">Team Members</label>
+    <div class="mb-4">
+      <label class="form-label fw-semibold">Team Members</label>
       <div id="membersContainer"></div>
-      <button type="button" id="addMemberBtn" class="add-btn mt-2">+ Add Member</button>
+
+      <div id="memberError" class="alert alert-danger d-none py-2 mt-2 border-0" role="alert">
+        Please fill out at least one team member's details before continuing.
+      </div>
+
+      <button type="button" id="addMemberBtn" class="add-btn mt-2">+ Add Another Member</button>
       <input type="hidden" name="members_json" id="members_json">
     </div>
 
-    <div class="text-center mt-4">
-      <button type="submit" class="btn btn-primary px-5">Save & Continue →</button>
+    <div class="text-center mt-5">
+      <button type="submit" class="btn btn-primary shadow-sm fs-5">Create Project 🚀</button>
     </div>
   </form>
 </div>
@@ -108,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("membersContainer");
   const addBtn = document.getElementById("addMemberBtn");
   const membersInput = document.getElementById("members_json");
+  const memberError = document.getElementById("memberError");
 
   function updateHiddenInput() {
     const members = [];
@@ -116,11 +140,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const last = row.querySelector(".last").value.trim();
       const email = row.querySelector(".email").value.trim();
       const num = row.querySelector(".num").value.trim();
+
+      // Only add to array if at least one field is filled out
       if (first || last || email || num) {
         members.push({ first, last, email, number: num });
       }
     });
     membersInput.value = JSON.stringify(members);
+
+    // Hide the error message as soon as the user starts typing a member
+    if (members.length > 0 && !memberError.classList.contains("d-none")) {
+      memberError.classList.add("d-none");
+    }
   }
 
   function addMemberRow(data = {}) {
@@ -131,29 +162,34 @@ document.addEventListener("DOMContentLoaded", () => {
       <input type="text" class="form-control last" placeholder="Last name" value="${data.last || ''}">
       <input type="text" class="form-control num" placeholder="Student number" value="${data.number || ''}">
       <input type="email" class="form-control email" placeholder="Email" value="${data.email || ''}">
-      <button type="button" class="remove-btn">×</button>
+      <button type="button" class="remove-btn" title="Remove member">×</button>
     `;
+
     row.querySelector(".remove-btn").addEventListener("click", () => {
       row.remove();
       updateHiddenInput();
     });
+
     ["input", "change"].forEach(evt => row.addEventListener(evt, updateHiddenInput));
     container.appendChild(row);
     updateHiddenInput();
   }
 
-  addBtn.addEventListener("click", () => addMemberRow());
-
+  // Initialize with one empty row
   addMemberRow();
 
+  addBtn.addEventListener("click", () => addMemberRow());
+
   document.getElementById("createProjectForm").addEventListener("submit", (e) => {
-  updateHiddenInput();
-  const members = JSON.parse(membersInput.value || "[]");
-  if (members.length === 0) {
-    e.preventDefault();
-    alert("Please add at least one team member.");
-  }
-});
+    updateHiddenInput();
+    const members = JSON.parse(membersInput.value || "[]");
+
+    // Check if the array is empty
+    if (members.length === 0) {
+      e.preventDefault(); // Stop form submission
+      memberError.classList.remove("d-none"); // Show Bootstrap alert
+    }
+  });
 
 });
 </script>

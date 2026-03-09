@@ -3,14 +3,101 @@
 {% block title %}SWOT Analysis — {{ project.title }}{% endblock %}
 
 {% block content %}
+<style>
+  body { background: #f8fafc; }
+  .swot-box {
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 320px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .swot-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  }
+  .swot-box h5 { font-weight: 700; margin-bottom: 1rem; color: #1e293b; }
+
+  /* Distinct top borders for categories */
+  .swot-box.strength { border-top: 5px solid #16a34a; }
+  .swot-box.weakness { border-top: 5px solid #f59e0b; }
+  .swot-box.opportunity { border-top: 5px solid #0ea5e9; }
+  .swot-box.threat { border-top: 5px solid #dc3545; }
+
+  .swot-list {
+    flex-grow: 1;
+    min-height: 50px; /* Drop target area */
+  }
+
+  .swot-card {
+    background: #f8fafc;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    position: relative;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+    cursor: grab;
+  }
+  .swot-card:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .swot-card:active { cursor: grabbing; }
+
+  .swot-card h6 { margin-bottom: 4px; font-weight: 600; font-size: 0.95rem; color: #0f172a; padding-right: 60px; }
+  .swot-card p { margin-bottom: 0; font-size: 0.85rem; color: #64748b; }
+
+  .swot-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .swot-card:hover .swot-actions { opacity: 1; }
+
+  /* SortableJS Visual Feedback */
+  .sortable-ghost { opacity: 0.4; background: #e2e8f0; border: 2px dashed #94a3b8; }
+  .sortable-chosen { background: #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+  /* Toast */
+  .save-toast {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: #16a34a;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(15px);
+    transition: all 0.4s ease;
+    z-index: 9999;
+    font-weight: 500;
+  }
+  .save-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+
 <div class="container-fluid py-4">
-  <h2 class="mb-3 text-center">🧭 Workshop 4 — SWOT Analysis</h2>
-  <p class="text-center text-muted">
-    Identify your project’s <strong>Strengths</strong>, <strong>Weaknesses</strong>, <strong>Opportunities</strong>, and <strong>Threats</strong>.
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0 fw-bold text-dark">🧭 Workshop 4 — SWOT Analysis</h2>
+  </div>
+  <p class="text-muted mb-4">
+    Identify your project’s <strong>Strengths</strong>, <strong>Weaknesses</strong>, <strong>Opportunities</strong>, and <strong>Threats</strong>. You can drag and drop items to reorder them.
   </p>
 
-  <!-- ✅ SWOT Grid -->
-  <div class="row g-3 mt-4">
+  <div class="row g-4 mt-2" id="swot-export-target" style="background: #f8fafc; padding: 10px; border-radius: 12px;">
     <div class="col-md-6">
       <div class="swot-box strength">
         <h5>💪 Strengths</h5>
@@ -22,15 +109,15 @@
               <p>{{ item.description }}</p>
             </div>
             <div class="swot-actions">
-              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
-              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+              <button class="btn btn-sm btn-light border edit-btn py-0 px-2" title="Edit">✏️</button>
+              <button class="btn btn-sm btn-light border text-danger delete-btn py-0 px-2" title="Delete">✖</button>
             </div>
           </div>
           {% empty %}
-          <p class="text-muted small">No strengths yet.</p>
+          <p class="text-muted small empty-msg">No strengths added yet.</p>
           {% endfor %}
         </div>
-        <button class="btn btn-success btn-sm mt-2 add-btn" data-category="S">➕ Add Strength</button>
+        <button class="btn btn-outline-success btn-sm mt-3 add-btn fw-medium" data-category="S">➕ Add Strength</button>
       </div>
     </div>
 
@@ -45,15 +132,15 @@
               <p>{{ item.description }}</p>
             </div>
             <div class="swot-actions">
-              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
-              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+              <button class="btn btn-sm btn-light border edit-btn py-0 px-2" title="Edit">✏️</button>
+              <button class="btn btn-sm btn-light border text-danger delete-btn py-0 px-2" title="Delete">✖</button>
             </div>
           </div>
           {% empty %}
-          <p class="text-muted small">No weaknesses yet.</p>
+          <p class="text-muted small empty-msg">No weaknesses added yet.</p>
           {% endfor %}
         </div>
-        <button class="btn btn-warning btn-sm mt-2 add-btn" data-category="W">➕ Add Weakness</button>
+        <button class="btn btn-outline-warning btn-sm mt-3 add-btn fw-medium text-dark" data-category="W">➕ Add Weakness</button>
       </div>
     </div>
 
@@ -68,15 +155,15 @@
               <p>{{ item.description }}</p>
             </div>
             <div class="swot-actions">
-              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
-              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+              <button class="btn btn-sm btn-light border edit-btn py-0 px-2" title="Edit">✏️</button>
+              <button class="btn btn-sm btn-light border text-danger delete-btn py-0 px-2" title="Delete">✖</button>
             </div>
           </div>
           {% empty %}
-          <p class="text-muted small">No opportunities yet.</p>
+          <p class="text-muted small empty-msg">No opportunities added yet.</p>
           {% endfor %}
         </div>
-        <button class="btn btn-info btn-sm mt-2 add-btn" data-category="O">➕ Add Opportunity</button>
+        <button class="btn btn-outline-info btn-sm mt-3 add-btn fw-medium" data-category="O">➕ Add Opportunity</button>
       </div>
     </div>
 
@@ -91,137 +178,77 @@
               <p>{{ item.description }}</p>
             </div>
             <div class="swot-actions">
-              <button class="btn btn-sm btn-outline-primary edit-btn">✏️</button>
-              <button class="btn btn-sm btn-outline-danger delete-btn">🗑️</button>
+              <button class="btn btn-sm btn-light border edit-btn py-0 px-2" title="Edit">✏️</button>
+              <button class="btn btn-sm btn-light border text-danger delete-btn py-0 px-2" title="Delete">✖</button>
             </div>
           </div>
           {% empty %}
-          <p class="text-muted small">No threats yet.</p>
+          <p class="text-muted small empty-msg">No threats added yet.</p>
           {% endfor %}
         </div>
-        <button class="btn btn-danger btn-sm mt-2 add-btn" data-category="T">➕ Add Threat</button>
+        <button class="btn btn-outline-danger btn-sm mt-3 add-btn fw-medium" data-category="T">➕ Add Threat</button>
       </div>
     </div>
   </div>
-</div>
-    <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-3">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mt-5">
+    <a href="{% url 'workshop_list' project.id %}" class="btn btn-outline-secondary px-4 rounded-pill">
       ← Back to Workshops
     </a>
+    <div class="d-flex gap-2 mt-3 mt-md-0">
+      <button id="downloadSwotBtn" class="btn btn-outline-secondary px-4 rounded-pill">📄 Download PNG</button>
+      <button id="saveContinueBtn" class="btn btn-success px-4 rounded-pill shadow-sm">💾 Save & Continue</button>
+    </div>
+  </div>
+</div>
 
-<!-- 🧩 Modal -->
 <div class="modal fade" id="swotModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Edit SWOT Entry</h5>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold">Edit SWOT Entry</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="editId">
         <input type="hidden" id="editCategory">
         <div class="mb-3">
-          <label class="form-label">Title</label>
-          <input type="text" class="form-control" id="editTitle">
+          <label class="form-label fw-semibold">Title</label>
+          <input type="text" class="form-control" id="editTitle" placeholder="Short, descriptive title">
         </div>
         <div class="mb-3">
-          <label class="form-label">Description</label>
-          <textarea class="form-control" id="editDescription" rows="3"></textarea>
+          <label class="form-label fw-semibold">Description</label>
+          <textarea class="form-control" id="editDescription" rows="3" placeholder="Explain the details..."></textarea>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-primary" id="saveEdit">Save</button>
+      <div class="modal-footer bg-light border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary px-4" id="saveEdit">Save Entry</button>
       </div>
     </div>
   </div>
 </div>
 
-<style>
-.swot-box {
-  border-radius: 12px;
-  padding: 15px;
-  min-height: 280px;
-  background: #fff;
-  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-  transition: all 0.3s;
-}
-.swot-box:hover {
-  transform: translateY(-2px);
-}
-.swot-box h5 { font-weight: 600; }
-.swot-box.strength { border-top: 5px solid #28a745; }
-.swot-box.weakness { border-top: 5px solid #ffc107; }
-.swot-box.opportunity { border-top: 5px solid #17a2b8; }
-.swot-box.threat { border-top: 5px solid #dc3545; }
+<div class="save-toast" id="saveToast">Changes saved successfully ✓</div>
 
-.swot-card {
-  background: #f8f9fa;
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin-bottom: 6px;
-  position: relative;
-  transition: 0.2s;
-}
-.swot-card:hover {
-  background: #eef1f5;
-}
-.swot-actions {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: flex;
-  gap: 4px;
-}
-/* ✨ Smooth floating quadrant animations */
-.swot-quadrant {
-  transition: all 0.25s ease-in-out;
-  transform: translateY(0);
-}
-.swot-quadrant:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-}
-
-/* 🪄 Animated card hover and drag state */
-.swot-card {
-  transition: all 0.25s ease;
-  cursor: grab;
-  border-radius: 10px;
-  border: 1px solid #dee2e6;
-  background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.swot-card:hover {
-  transform: scale(1.03);
-  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-}
-
-/* 🎨 Visual feedback when dragging cards */
-.swot-card.sortable-chosen {
-  background: #e9f7ef;
-  border-color: #28a745;
-  box-shadow: 0 4px 12px rgba(40,167,69,0.3);
-}
-Sortable.create(el, {
-  group: "swot",
-  animation: 200,
-  ghostClass: "sortable-ghost",
-  chosenClass: "sortable-chosen",
-  dragClass: "sortable-drag"
-});
-/* 🎯 Drop target glow */
-.quad-body.sortable-ghost {
-  border: 2px dashed #007bff;
-  background-color: #f0f8ff;
-}
-
-</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const modal = new bootstrap.Modal(document.getElementById("swotModal"));
   const saveBtn = document.getElementById("saveEdit");
+  const toast = document.getElementById("saveToast");
 
+  // Show Toast Helper
+  function showToast(msg) {
+    if (!toast) return;
+    if (msg) toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2000);
+  }
+
+  // Add Item Logic
   document.querySelectorAll(".add-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.getElementById("editId").value = "";
@@ -232,6 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Edit Item Logic
   document.querySelectorAll(".edit-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       const card = e.target.closest(".swot-card");
@@ -242,23 +270,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Delete Item Logic
   document.querySelectorAll(".delete-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       const id = e.target.closest(".swot-card").dataset.id;
-      if (confirm("Delete this entry?")) saveChange("delete", { id });
+      if (confirm("Are you sure you want to delete this entry?")) {
+        saveChange("delete", { id });
+      }
     });
   });
 
+  // Save Modal Data
   saveBtn.addEventListener("click", () => {
     const id = document.getElementById("editId").value;
     const category = document.getElementById("editCategory").value;
     const title = document.getElementById("editTitle").value;
     const description = document.getElementById("editDescription").value;
+
+    if (!title.trim()) {
+        alert("Please provide a title.");
+        return;
+    }
+
     const action = id ? "edit" : "add";
     saveChange(action, { id, category, title, description });
     modal.hide();
   });
 
+  // AJAX Backend Call
   function saveChange(action, payload) {
     fetch("{% url 'save_swot_entry' project.id %}", {
       method: "POST",
@@ -267,10 +306,59 @@ document.addEventListener("DOMContentLoaded", () => {
     })
     .then(res => res.json())
     .then(data => {
-      if (data.status) location.reload();
-      else alert("Error saving change");
-    });
+      if (data.status === "ok") {
+        location.reload(); // Quick reload to show updated data
+      } else {
+        alert("Error saving change: " + (data.message || "Unknown error"));
+      }
+    })
+    .catch(() => alert("Network error. Could not save."));
   }
+
+  // ✅ Initialize Drag and Drop using SortableJS
+  const lists = ["strengthList", "weaknessList", "opportunityList", "threatList"];
+  lists.forEach(listId => {
+    const el = document.getElementById(listId);
+    if (el) {
+      Sortable.create(el, {
+        group: "swot", // Allows dragging between categories if needed
+        animation: 200,
+        ghostClass: "sortable-ghost",
+        chosenClass: "sortable-chosen",
+        onEnd: function (evt) {
+            // Optional: You can implement the 'reorder' AJAX call here using evt.item and evt.to
+            showToast("Order updated!");
+        }
+      });
+    }
+  });
+
+  // ✅ Download PNG Logic
+  document.getElementById("downloadSwotBtn").addEventListener("click", () => {
+    const target = document.getElementById("swot-export-target");
+
+    // Temporarily hide action buttons on cards so they don't show in the export
+    document.querySelectorAll(".swot-actions").forEach(el => el.style.display = 'none');
+
+    html2canvas(target, { scale: 2, backgroundColor: "#f8fafc" }).then(canvas => {
+      // Restore action buttons
+      document.querySelectorAll(".swot-actions").forEach(el => el.style.display = '');
+
+      const link = document.createElement("a");
+      link.download = `SWOT_Analysis_{{ project.title|slugify }}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  });
+
+  // ✅ Save & Continue Logic
+  document.getElementById("saveContinueBtn").addEventListener("click", () => {
+    // Since items are saved instantly on creation, this just provides UX feedback and redirects
+    showToast("SWOT Analysis finalized!");
+    setTimeout(() => {
+      window.location.href = "{% url 'workshop_list' project.id %}";
+    }, 800);
+  });
 });
 </script>
 {% endblock %}

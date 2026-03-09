@@ -46,6 +46,9 @@ urlpatterns = [
 
 
     # WORKSHOP 4 — SWOT Analysis
+# WORKSHOP 4.1 — Indicator Analysis
+    path("project/<int:project_id>/indicator-analysis/", views.indicator_analysis_view, name="indicator_analysis"),
+    path("project/<int:project_id>/indicator-analysis/upload/", views.upload_indicator_image, name="upload_indicator_image"),
     path("project/<int:project_id>/swot/", swot_analysis_view, name="swot_analysis"),
     path("project/<int:project_id>/swot/save/", save_swot_entry, name="save_swot_entry"),
 

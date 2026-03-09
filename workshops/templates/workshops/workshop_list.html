@@ -114,8 +114,11 @@
         {% elif not ws_flags.indicator_ranking %}
           <strong>Workshop 3.2 — Indicator Ranking (Simos)</strong>
           <div class="muted">Rank selected indicators and generate weights.</div>
+        {% elif not ws_flags.indicator_analysis %}
+          <strong>Workshop 4.1 — Indicator Analysis</strong>
+          <div class="muted">Upload data charts for your selected indicators.</div>
         {% elif not ws_flags.swot %}
-          <strong>Workshop 4 — SWOT Analysis</strong>
+          <strong>Workshop 4.2 — SWOT Analysis</strong>
           <div class="muted">Fill the SWOT matrix to summarize insights.</div>
         {% elif not ws_flags.scenario %}
           <strong>Workshop 5 — Scenario & Q-Methodology</strong>
@@ -139,8 +142,10 @@
           <a class="btn btn-primary" href="{% url 'indicator_selection' project.id %}">Start Workshop 3.1 →</a>
         {% elif not ws_flags.indicator_ranking %}
           <a class="btn btn-primary" href="{% url 'indicator_ranking' project.id %}">Start Workshop 3.2 →</a>
+        {% elif not ws_flags.indicator_analysis %}
+          <a class="btn btn-primary" href="{% url 'indicator_analysis' project.id %}">Start Workshop 4.1 →</a>
         {% elif not ws_flags.swot %}
-          <a class="btn btn-primary" href="{% url 'swot_analysis' project.id %}">Start Workshop 4 →</a>
+          <a class="btn btn-primary" href="{% url 'swot_analysis' project.id %}">Start Workshop 4.2 →</a>
         {% elif not ws_flags.scenario %}
           <a class="btn btn-primary" href="{% url 'scenario_building' project.id %}">Start Workshop 5 →</a>
         {% endif %}
@@ -150,7 +155,6 @@
 
   <div class="grid">
 
-    <!-- Workshop 1 -->
     <div class="col">
       <div class="ws-card">
         <div class="ws-top">
@@ -169,7 +173,6 @@
       </div>
     </div>
 
-    <!-- Workshop 2.1 (locked if Workshop 1 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.overview %}locked{% endif %}">
         <div class="ws-top">
@@ -195,7 +198,6 @@
       </div>
     </div>
 
-    <!-- Workshop 2.2 (locked if 2.1 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.stakeholders %}locked{% endif %}">
         <div class="ws-top">
@@ -221,7 +223,6 @@
       </div>
     </div>
 
-    <!-- Workshop 2.3 (locked if 2.2 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.problem_tree %}locked{% endif %}">
         <div class="ws-top">
@@ -247,7 +248,6 @@
       </div>
     </div>
 
-    <!-- Workshop 3.1 (locked if 2.3 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.objective_tree %}locked{% endif %}">
         <div class="ws-top">
@@ -273,7 +273,6 @@
       </div>
     </div>
 
-    <!-- Workshop 3.2 (locked if 3.1 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.indicator_selection %}locked{% endif %}">
         <div class="ws-top">
@@ -299,14 +298,39 @@
       </div>
     </div>
 
-    <!-- Workshop 4 (locked if 3.2 not done) -->
+    <div class="col">
+      <div class="ws-card {% if not ws_flags.indicator_ranking %}locked{% endif %}">
+        <div class="ws-top">
+          <div class="d-flex gap-3">
+            <div class="ws-icon i-yellow">📸</div>
+            <div>
+              <p class="ws-title">Workshop 4.1 — Indicator Analysis</p>
+              <p class="ws-sub">Upload data charts for selected indicators.</p>
+            </div>
+          </div>
+          {% if not ws_flags.indicator_ranking %}<span class="badge b-locked">Locked</span>
+          {% elif ws_flags.indicator_analysis %}<span class="badge b-done">Completed</span>
+          {% else %}<span class="badge b-todo">Not started</span>{% endif %}
+        </div>
+        <div class="ws-actions">
+          {% if ws_flags.indicator_ranking %}
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'indicator_analysis' project.id %}">Open</a>
+          {% else %}
+            <span class="text-muted small">Complete Workshop 3.2 first</span>
+          {% endif %}
+        </div>
+        <div class="locked-overlay"><div class="text-center"><div style="font-size:1.3rem;">🔒</div><div class="small text-muted">Complete Workshop 3.2 to unlock</div></div></div>
+      </div>
+    </div>
+
+
     <div class="col">
       <div class="ws-card {% if not ws_flags.indicator_ranking %}locked{% endif %}">
         <div class="ws-top">
           <div class="d-flex gap-3">
             <div class="ws-icon i-yellow">💡</div>
             <div>
-              <p class="ws-title">Workshop 4 — SWOT Analysis</p>
+              <p class="ws-title">Workshop 4.2 — SWOT Analysis</p>
               <p class="ws-sub">Fill Strengths, Weaknesses, Opportunities, Threats.</p>
             </div>
           </div>
@@ -325,7 +349,6 @@
       </div>
     </div>
 
-    <!-- Workshop 5 (locked if 4 not done) -->
     <div class="col">
       <div class="ws-card {% if not ws_flags.swot %}locked{% endif %}">
         <div class="ws-top">
@@ -344,29 +367,14 @@
           {% if ws_flags.swot %}
             <a class="btn btn-outline-primary btn-sm" href="{% url 'scenario_building' project.id %}">Open</a>
           {% else %}
-            <span class="text-muted small">Complete Workshop 4 first</span>
+            <span class="text-muted small">Complete Workshop 4.2 first</span>
           {% endif %}
         </div>
-        <div class="locked-overlay"><div class="text-center"><div style="font-size:1.3rem;">🔒</div><div class="small text-muted">Complete Workshop 4 to unlock</div></div></div>
+        <div class="locked-overlay"><div class="text-center"><div style="font-size:1.3rem;">🔒</div><div class="small text-muted">Complete Workshop 4.2 to unlock</div></div></div>
       </div>
     </div>
 
-    <!-- Planned workshops -->
-    <div class="col">
-      <div class="ws-card">
-        <div class="ws-top">
-          <div class="d-flex gap-3">
-            <div class="ws-icon i-gray">📈</div>
-            <div>
-              <p class="ws-title">Workshop 6 — Performance Matrix</p>
-              <p class="ws-sub">Compare scenarios using weighted indicators. (Planned)</p>
-            </div>
-          </div>
-          <span class="badge b-planned">Planned</span>
-        </div>
-        <div class="ws-actions"><span class="text-muted small">Coming soon</span></div>
-      </div>
-    </div>
+
 
     <div class="col">
       <div class="ws-card">
@@ -374,7 +382,7 @@
           <div class="d-flex gap-3">
             <div class="ws-icon i-gray">🧠</div>
             <div>
-              <p class="ws-title">Workshop 7 — Scenario Analysis</p>
+              <p class="ws-title">Workshop 6 — Scenario Analysis</p>
               <p class="ws-sub">Interpret and discuss final scenario outcomes. (Planned)</p>
             </div>
           </div>

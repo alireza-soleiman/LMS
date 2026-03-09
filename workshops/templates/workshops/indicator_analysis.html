@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}Workshop 4.1 — Indicator Analysis{% endblock %}
+
+{% block content %}
+<style>
+  body { background: #f8fafc; }
+  .indicator-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+    transition: all 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .indicator-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  }
+  .upload-area {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f1f5f9;
+    text-align: center;
+    padding: 2rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .upload-area:hover {
+    border-color: #0d6efd;
+    background: #eff6ff;
+  }
+  .preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 6px;
+    object-fit: contain;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  /* Hidden file input */
+  .file-input { display: none; }
+</style>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0 fw-bold text-dark">📊 Workshop 4.1 — Indicator Analysis</h2>
+  </div>
+  <p class="text-muted mb-4">
+    Upload the collected data charts or images for each of your selected indicators below.
+  </p>
+
+  <div class="row g-4">
+    {% for indicator in indicators %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card indicator-card p-3">
+        <h6 class="fw-bold text-primary mb-1">{{ indicator.name }}</h6>
+        <p class="small text-muted mb-3">{{ indicator.criterion }} | {{ indicator.unit }}</p>
+
+        <form class="upload-form h-100 d-flex flex-column" data-id="{{ indicator.id }}" data-name="{{ indicator.name }}">
+          <input type="file" class="file-input" accept="image/png, image/jpeg, image/jpg" required>
+          
+          <div class="upload-area" onclick="this.previousElementSibling.click()">
+
+            {% if indicator.current_image %}
+              <img src="{{ indicator.current_image }}" class="preview-image mb-3" alt="Uploaded Data">
+              <span class="btn btn-sm btn-light border fw-medium mt-auto">🔄 Change Picture</span>
+
+            {% else %}
+              <div class="preview-container d-none mb-3">
+                <img src="" class="preview-image" alt="Preview">
+              </div>
+              <div class="placeholder-text text-center">
+                <span style="font-size: 2.5rem; display:block; margin-bottom: 10px;">📸</span>
+                <span class="text-muted fw-medium small">Click to upload data chart</span>
+              </div>
+              <span class="btn btn-sm btn-outline-primary mt-auto d-none upload-btn-ui">🔄 Change Picture</span>
+            {% endif %}
+
+          </div>
+        </form>
+
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-4">
+        <h5>No Indicators Selected</h5>
+        <p class="mb-0 text-muted">You must select indicators in Workshop 3.1 before analyzing data.</p>
+        <a href="{% url 'indicator_selection' project.id %}" class="btn btn-warning mt-3 rounded-pill fw-medium">← Go to Indicator Selection</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+{% if indicators %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center mt-5">
+    <a href="{% url 'indicator_selection' project.id %}" class="btn btn-outline-secondary px-4 rounded-pill">
+      ← Back to Selection
+    </a>
+    <div class="d-flex gap-2">
+      <button id="downloadPdfBtn" class="btn btn-outline-secondary px-4 rounded-pill">
+        📄 Download PDF Report
+      </button>
+      <a href="{% url 'swot_analysis' project.id %}" class="btn btn-success px-4 rounded-pill shadow-sm">
+        Proceed to SWOT Analysis →
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="save-toast position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+  <div id="uploadToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body fw-medium">
+        Image uploaded successfully!
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const toastEl = document.getElementById('uploadToast');
+  const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
+
+  document.querySelectorAll('.file-input').forEach(input => {
+    input.addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+
+      const form = this.closest('.upload-form');
+      const uploadArea = form.querySelector('.upload-area');
+      const placeholder = form.querySelector('.placeholder-text');
+      const previewContainer = form.querySelector('.preview-container');
+      const previewImg = form.querySelector('.preview-image');
+      const btnUi = form.querySelector('.upload-btn-ui');
+
+      // 1. Show local preview instantly
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (placeholder) placeholder.classList.add('d-none');
+        if (previewContainer) previewContainer.classList.remove('d-none');
+        previewImg.src = e.target.result;
+        if (btnUi) btnUi.classList.remove('d-none');
+      };
+      reader.readAsDataURL(file);
+
+      // 2. Upload to Server via AJAX
+      const formData = new FormData();
+      formData.append('indicator_id', form.dataset.id);
+      formData.append('indicator_name', form.dataset.name);
+      formData.append('data_image', file);
+
+      try {
+        const response = await fetch("{% url 'upload_indicator_image' project.id %}", {
+          method: 'POST',
+          headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+          body: formData
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+          toast.show();
+        } else {
+          alert('Upload failed: ' + data.message);
+        }
+      } catch (error) {
+        alert('Network error during upload.');
+      }
+    });
+  });
+  // -----------------------------------------
+  // PROFESSIONAL PDF EXPORT LOGIC
+  // -----------------------------------------
+  const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+  if (downloadPdfBtn) {
+    downloadPdfBtn.addEventListener("click", async () => {
+      // Temporarily change button text
+      const originalText = downloadPdfBtn.innerText;
+      downloadPdfBtn.innerText = "⏳ Generating PDF...";
+      downloadPdfBtn.disabled = true;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("p", "mm", "a4");
+
+      const cards = document.querySelectorAll(".indicator-card");
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+
+      // Theme Colors
+      const COLORS = {
+        headerBg: [30, 41, 59],     // Dark Slate
+        white: [255, 255, 255],
+        ink: [15, 23, 42],          // Almost black
+        muted: [100, 116, 139],     // Gray
+        primary: [13, 110, 253]     // Bootstrap Blue
+      };
+
+      // Helper to extract image data cleanly
+      const getBase64Image = (imgEl) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = imgEl.naturalWidth;
+        canvas.height = imgEl.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(imgEl, 0, 0);
+        return canvas.toDataURL("image/jpeg", 0.95);
+      };
+
+      for(let i = 0; i < cards.length; i++) {
+          if(i > 0) doc.addPage(); // Add a new page for every indicator after the first
+
+          const card = cards[i];
+          const name = card.querySelector("h6").innerText;
+          const metaInfo = card.querySelector("p").innerText;
+
+          // Header Band
+          doc.setFillColor(...COLORS.headerBg);
+          doc.rect(0, 0, pageWidth, 28, "F");
+          doc.setTextColor(...COLORS.white);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(16);
+          doc.text("Indicator Analysis Report", margin, 18);
+
+          // Project Title & Date
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(...COLORS.muted);
+          doc.text(`Project: {{ project.title }}`, margin, 40);
+          doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - margin, 40, { align: "right" });
+
+          // Divider Line
+          doc.setDrawColor(226, 232, 240);
+          doc.line(margin, 44, pageWidth - margin, 44);
+
+          // Indicator Title
+          doc.setTextColor(...COLORS.primary);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(16);
+          const splitTitle = doc.splitTextToSize(`Indicator: ${name}`, pageWidth - margin*2);
+          doc.text(splitTitle, margin, 56);
+          let yPos = 56 + (splitTitle.length * 8);
+
+          // Meta Info (Criterion & Unit)
+          doc.setTextColor(...COLORS.ink);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          doc.text(`Details: ${metaInfo}`, margin, yPos);
+          yPos += 15;
+
+          // Process the Image
+          const imgEl = card.querySelector("img.preview-image");
+          // Check if image exists, has a valid source, and isn't hidden by the d-none class
+          const hasImage = imgEl && imgEl.src && !imgEl.src.endsWith("undefined") && !imgEl.closest('.preview-container')?.classList.contains('d-none') && !imgEl.classList.contains('d-none');
+
+          if(hasImage) {
+              try {
+                  const imgData = getBase64Image(imgEl);
+
+                  // Calculate dimensions to fit on the page perfectly without stretching
+                  const maxW = pageWidth - margin * 2;
+                  const maxH = pageHeight - yPos - 30; // Leave 30mm for the footer
+                  const ratio = Math.min(maxW / imgEl.naturalWidth, maxH / imgEl.naturalHeight);
+
+                  const finalW = imgEl.naturalWidth * ratio;
+                  const finalH = imgEl.naturalHeight * ratio;
+
+                  // Center the image horizontally
+                  const xPos = (pageWidth - finalW) / 2;
+
+                  doc.addImage(imgData, 'JPEG', xPos, yPos, finalW, finalH);
+              } catch (e) {
+                  console.error("Could not process image for PDF", e);
+                  doc.setTextColor(...COLORS.muted);
+                  doc.text("Error rendering image for export.", margin, yPos);
+              }
+          } else {
+              // Draw a grey placeholder box if no image was uploaded
+              doc.setFillColor(241, 245, 249);
+              doc.roundedRect(margin, yPos, pageWidth - margin*2, 40, 3, 3, "F");
+              doc.setTextColor(...COLORS.muted);
+              doc.setFont("helvetica", "italic");
+              doc.text("No data chart uploaded for this indicator.", pageWidth/2, yPos + 20, { align: "center" });
+          }
+
+          // Footer (Page Numbers)
+          doc.setTextColor(...COLORS.muted);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.text(`Page ${i + 1} of ${cards.length}`, pageWidth/2, pageHeight - 12, { align: "center" });
+      }
+
+      // Save the PDF
+      doc.save(`Indicator_Analysis_{{ project.title|slugify }}.pdf`);
+
+      // Restore Button
+      downloadPdfBtn.innerText = originalText;
+      downloadPdfBtn.disabled = false;
+      showToast("PDF Exported Successfully!", "success");
+    });
+  }
+});
+</script>
+{% endblock %}

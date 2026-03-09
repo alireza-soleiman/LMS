@@ -4,93 +4,94 @@
 
 <style>
   body {
-    background: #f7f9fc;
-    font-family: "Inter", sans-serif;
-  }
-  h2 {
-    font-weight: 600;
-    color: #1e293b;
+    background-color: #f8fafc; /* Matches base.html */
   }
   .dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.2rem;
+    margin-bottom: 2rem;
   }
-  .dashboard-header .btn {
-    border-radius: 0.5rem;
+  .dashboard-title {
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.5px;
   }
   .card {
     border: none;
     border-radius: 1rem;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
   }
   .progress {
     height: 8px;
     border-radius: 10px;
+    background-color: #e2e8f0;
   }
   .progress-bar {
-    background: linear-gradient(90deg, #2563eb, #4f46e5);
+    background: linear-gradient(90deg, #0d6efd, #0b5ed7);
   }
-  .btn-outline-primary {
-    border: 1px solid #2563eb;
-    color: #2563eb;
-    border-radius: 0.5rem;
-  }
-  .btn-outline-primary:hover {
-    background: #2563eb;
-    color: #fff;
-  }
-  .btn-success {
-    border-radius: 0.5rem;
-  }
+
+  /* Modern Empty State Styling */
   .empty-state {
     text-align: center;
-    margin-top: 10vh;
+    padding: 4rem 2rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+    max-width: 600px;
+    margin: 2rem auto; /* Centers the box */
   }
   .empty-state img {
-    width: 180px;
-    opacity: 0.9;
+    max-width: 220px;
+    height: auto;
+    margin-bottom: 1.5rem;
+  }
+  .empty-state h4 {
+    font-weight: 600;
+    color: #1e293b;
   }
   .empty-state p {
     color: #64748b;
+    font-size: 1.1rem;
+    margin-bottom: 2.5rem;
+  }
+  .btn-create {
+    border-radius: 50rem; /* Pill shape for primary action */
+    font-weight: 500;
   }
 </style>
 
 <div class="container py-4">
   <div class="dashboard-header">
-    <h2>Welcome, {{ user.username }} 👋</h2>
-    {% if not user.is_staff and not project_cards %}
-  <a href="{% url 'create_project' %}" class="btn btn-success">+ Create Your Project</a>
-{% endif %}
-  </div>
+    <h2 class="dashboard-title">Welcome, {{ user.username }} 👋</h2>
+    </div>
 
   {% if project_cards %}
     <div class="row g-4">
       {% for card in project_cards %}
       <div class="col-md-6 col-lg-4">
-        <div class="card h-100 p-3">
+        <div class="card h-100 p-4">
           <div class="d-flex justify-content-between align-items-start mb-2">
-            <h5 class="fw-semibold text-primary mb-0">{{ card.project.title }}</h5>
+            <h5 class="fw-bold text-primary mb-0">{{ card.project.title }}</h5>
             {% if user.is_staff %}
-              <span class="badge text-bg-light">Owner: {{ card.project.owner.username }}</span>
+              <span class="badge bg-secondary rounded-pill">Owner: {{ card.project.owner.username }}</span>
             {% endif %}
           </div>
-          <p class="text-muted small mb-2">{{ card.project.description|default:"No description yet" }}</p>
 
-          <div class="progress mb-3">
+          <p class="text-muted small mb-3" style="min-height: 40px;">
+            {{ card.project.description|default:"No description provided." }}
+          </p>
+
+          <div class="progress mb-2">
             <div class="progress-bar" role="progressbar" style="width: {{ card.percent }}%" aria-valuenow="{{ card.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
           </div>
-          <p class="small text-muted mb-3">{{ card.completed }}/{{ card.total }} Workshops completed ({{ card.percent }}%)</p>
+          <p class="small text-muted mb-4 fw-medium">{{ card.completed }}/{{ card.total }} Workshops completed ({{ card.percent }}%)</p>
 
-          <div class="d-flex justify-content-between">
-            <a href="{% url 'project_overview' card.project.id %}" class="btn btn-outline-primary btn-sm">📝 Edit Overview</a>
-            <a href="{% url 'workshop_list' card.project.id %}" class="btn btn-primary btn-sm">🚀 Continue to Workshops</a>
+          <div class="d-flex justify-content-between gap-2 mt-auto">
+            <a href="{% url 'project_overview' card.project.id %}" class="btn btn-outline-primary btn-sm flex-fill py-2 fw-medium">📝 Edit Overview</a>
+            <a href="{% url 'workshop_list' card.project.id %}" class="btn btn-primary btn-sm flex-fill py-2 fw-medium">🚀 Continue</a>
           </div>
         </div>
       </div>
@@ -98,10 +99,13 @@
     </div>
   {% else %}
     <div class="empty-state">
-      <img src="https://memrisys2023.polito.it/app/uploads/2023/05/Polito_Logo_2021_BLU-300x132.png" alt="No Project">
-      <h4 class="mt-3">No Projects Yet</h4>
-      <p class="mb-3">Start by creating your first project to begin your workshop journey.</p>
-      <a href="{% url 'create_project' %}" class="btn btn-success px-4 py-2">+ Create New Project</a>
+      <img src="https://memrisys2023.polito.it/app/uploads/2023/05/Polito_Logo_2021_BLU-300x132.png" alt="Politecnico di Torino Logo">
+      <h4>No Projects Yet</h4>
+      <p>Start by creating your first project to begin your workshop journey.</p>
+
+      <a href="{% url 'create_project' %}" class="btn btn-primary btn-lg px-5 py-2 btn-create shadow-sm">
+        + Create New Project
+      </a>
     </div>
   {% endif %}
 </div>

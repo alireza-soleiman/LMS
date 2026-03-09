@@ -201,3 +201,18 @@ class SWOTItem(models.Model):
 
     def __str__(self):
         return f"{self.get_category_display()}: {self.title}"
+
+
+class IndicatorData(models.Model):
+    """Stores the uploaded data picture for a specific indicator in a project."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='indicator_data')
+    indicator_id = models.CharField(max_length=50) # The ID of the indicator selected in WS 3.1
+    indicator_name = models.CharField(max_length=255)
+    data_image = models.ImageField(upload_to='indicator_uploads/', blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('project', 'indicator_id')
+
+    def __str__(self):
+        return f"{self.indicator_name} Data - {self.project.title}"
